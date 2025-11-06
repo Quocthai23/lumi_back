@@ -1,0 +1,118 @@
+{
+  "annotations": {
+    "changelogDate": "20251106112314"
+  },
+  "applications": ["lumiere"],
+  "documentation": "Thực thể Product, đại diện cho một mặt hàng.\\nFrontend: src/types/product.ts\\n@filter",
+  "dto": "mapstruct",
+  "fields": [
+    {
+      "fieldName": "code",
+      "fieldType": "String",
+      "fieldValidateRules": ["required", "unique", "minlength", "maxlength"],
+      "fieldValidateRulesMaxlength": "64",
+      "fieldValidateRulesMinlength": "3"
+    },
+    {
+      "fieldName": "name",
+      "fieldType": "String",
+      "fieldValidateRules": ["required", "minlength", "maxlength"],
+      "fieldValidateRulesMaxlength": "200",
+      "fieldValidateRulesMinlength": "2"
+    },
+    {
+      "fieldName": "slug",
+      "fieldType": "String",
+      "fieldValidateRules": ["required", "unique", "minlength"],
+      "fieldValidateRulesMinlength": "2"
+    },
+    {
+      "fieldName": "description",
+      "fieldType": "TextBlob"
+    },
+    {
+      "fieldName": "status",
+      "fieldType": "ProductStatus",
+      "fieldValidateRules": ["required"],
+      "fieldValues": "ACTIVE,INACTIVE,DRAFT"
+    },
+    {
+      "fieldName": "category",
+      "fieldType": "String"
+    },
+    {
+      "fieldName": "material",
+      "fieldType": "String"
+    },
+    {
+      "fieldName": "averageRating",
+      "fieldType": "Double",
+      "fieldValidateRules": ["min", "max"],
+      "fieldValidateRulesMax": "5",
+      "fieldValidateRulesMin": "0"
+    },
+    {
+      "fieldName": "reviewCount",
+      "fieldType": "Integer",
+      "fieldValidateRules": ["min"],
+      "fieldValidateRulesMin": "0"
+    },
+    {
+      "fieldName": "images",
+      "fieldType": "TextBlob"
+    },
+    {
+      "fieldName": "createdAt",
+      "fieldType": "Instant",
+      "fieldValidateRules": ["required"]
+    },
+    {
+      "fieldName": "updatedAt",
+      "fieldType": "Instant"
+    }
+  ],
+  "jpaMetamodelFiltering": true,
+  "name": "Product",
+  "pagination": "pagination",
+  "relationships": [
+    {
+      "otherEntityName": "productVariant",
+      "otherEntityRelationshipName": "product",
+      "relationshipName": "variants",
+      "relationshipSide": "right",
+      "relationshipType": "one-to-many"
+    },
+    {
+      "otherEntityName": "productReview",
+      "otherEntityRelationshipName": "product",
+      "relationshipName": "reviews",
+      "relationshipSide": "right",
+      "relationshipType": "one-to-many"
+    },
+    {
+      "otherEntityName": "productQuestion",
+      "otherEntityRelationshipName": "product",
+      "relationshipName": "questions",
+      "relationshipSide": "right",
+      "relationshipType": "one-to-many"
+    },
+    {
+      "otherEntityField": "name",
+      "otherEntityName": "collection",
+      "otherEntityRelationshipName": "products",
+      "relationshipName": "collections",
+      "relationshipSide": "right",
+      "relationshipType": "many-to-many"
+    },
+    {
+      "otherEntityField": "firstName",
+      "otherEntityName": "customer",
+      "otherEntityRelationshipName": "wishlist",
+      "relationshipName": "wishlistedBy",
+      "relationshipSide": "right",
+      "relationshipType": "many-to-many"
+    }
+  ],
+  "searchEngine": "no",
+  "service": "serviceImpl"
+}

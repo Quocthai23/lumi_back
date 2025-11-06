@@ -1,0 +1,43 @@
+{
+  "annotations": {
+    "changelogDate": "20251106113714"
+  },
+  "applications": ["lumiere"],
+  "documentation": "Lịch sử điểm thưởng của khách hàng.\\nFrontend: src/pages/customer/LoyaltyPage.tsx",
+  "dto": "mapstruct",
+  "fields": [
+    {
+      "fieldName": "type",
+      "fieldType": "LoyaltyTransactionType",
+      "fieldValidateRules": ["required"],
+      "fieldValues": "EARNED,REDEEMED,ADJUSTMENT"
+    },
+    {
+      "fieldName": "points",
+      "fieldType": "Integer",
+      "fieldValidateRules": ["required"]
+    },
+    {
+      "fieldName": "description",
+      "fieldType": "String"
+    },
+    {
+      "fieldName": "createdAt",
+      "fieldType": "Instant",
+      "fieldValidateRules": ["required"]
+    }
+  ],
+  "name": "LoyaltyTransaction",
+  "relationships": [
+    {
+      "otherEntityField": "firstName",
+      "otherEntityName": "customer",
+      "otherEntityRelationshipName": "loyaltyHistory",
+      "relationshipName": "customer",
+      "relationshipSide": "left",
+      "relationshipType": "many-to-one"
+    }
+  ],
+  "searchEngine": "no",
+  "service": "serviceImpl"
+}

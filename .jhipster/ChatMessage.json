@@ -1,0 +1,39 @@
+{
+  "annotations": {
+    "changelogDate": "20251106114414"
+  },
+  "applications": ["lumiere"],
+  "documentation": "Tin nhắn trong phiên chat.\\nFrontend: src/types/chat.ts",
+  "dto": "mapstruct",
+  "fields": [
+    {
+      "fieldName": "sender",
+      "fieldType": "MessageSender",
+      "fieldValidateRules": ["required"],
+      "fieldValues": "USER,BOT"
+    },
+    {
+      "fieldName": "text",
+      "fieldType": "TextBlob",
+      "fieldValidateRules": ["required"]
+    },
+    {
+      "fieldName": "timestamp",
+      "fieldType": "Instant",
+      "fieldValidateRules": ["required"]
+    }
+  ],
+  "name": "ChatMessage",
+  "relationships": [
+    {
+      "otherEntityField": "id",
+      "otherEntityName": "chatSession",
+      "otherEntityRelationshipName": "messages",
+      "relationshipName": "session",
+      "relationshipSide": "left",
+      "relationshipType": "many-to-one"
+    }
+  ],
+  "searchEngine": "no",
+  "service": "serviceImpl"
+}

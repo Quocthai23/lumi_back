@@ -1,0 +1,48 @@
+{
+  "annotations": {
+    "changelogDate": "20251106114114"
+  },
+  "applications": ["lumiere"],
+  "documentation": "Thông báo (cho cả admin và khách hàng).\\nFrontend: src/types/notification.ts",
+  "dto": "mapstruct",
+  "fields": [
+    {
+      "fieldName": "message",
+      "fieldType": "String",
+      "fieldValidateRules": ["required"]
+    },
+    {
+      "fieldName": "type",
+      "fieldType": "NotificationType",
+      "fieldValidateRules": ["required"],
+      "fieldValues": "ORDER_UPDATE,NEW_ANSWER,PROMOTION,NEW_ORDER,NEW_CUSTOMER,NEW_QA,LOW_STOCK"
+    },
+    {
+      "fieldName": "isRead",
+      "fieldType": "Boolean",
+      "fieldValidateRules": ["required"]
+    },
+    {
+      "fieldName": "link",
+      "fieldType": "String"
+    },
+    {
+      "fieldName": "createdAt",
+      "fieldType": "Instant",
+      "fieldValidateRules": ["required"]
+    }
+  ],
+  "name": "Notification",
+  "relationships": [
+    {
+      "otherEntityField": "firstName",
+      "otherEntityName": "customer",
+      "otherEntityRelationshipName": "notifications",
+      "relationshipName": "customer",
+      "relationshipSide": "left",
+      "relationshipType": "many-to-one"
+    }
+  ],
+  "searchEngine": "no",
+  "service": "serviceImpl"
+}

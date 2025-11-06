@@ -1,0 +1,38 @@
+{
+  "annotations": {
+    "changelogDate": "20251106113014"
+  },
+  "applications": ["lumiere"],
+  "documentation": "Lịch sử thay đổi trạng thái đơn hàng.\\nFrontend: src/types/order.ts",
+  "dto": "mapstruct",
+  "fields": [
+    {
+      "fieldName": "status",
+      "fieldType": "OrderStatus",
+      "fieldValidateRules": ["required"],
+      "fieldValues": "PENDING,CONFIRMED,PROCESSING,SHIPPING,DELIVERED,COMPLETED,CANCELLED,DRAFT"
+    },
+    {
+      "fieldName": "description",
+      "fieldType": "String"
+    },
+    {
+      "fieldName": "timestamp",
+      "fieldType": "Instant",
+      "fieldValidateRules": ["required"]
+    }
+  ],
+  "name": "OrderStatusHistory",
+  "relationships": [
+    {
+      "otherEntityField": "code",
+      "otherEntityName": "orders",
+      "otherEntityRelationshipName": "orderStatusHistory",
+      "relationshipName": "order",
+      "relationshipSide": "left",
+      "relationshipType": "many-to-one"
+    }
+  ],
+  "searchEngine": "no",
+  "service": "serviceImpl"
+}

@@ -1,0 +1,50 @@
+{
+  "annotations": {
+    "changelogDate": "20251106113814"
+  },
+  "applications": ["lumiere"],
+  "documentation": "Đánh giá sản phẩm.\\nFrontend: src/types/product.ts (Review)",
+  "dto": "mapstruct",
+  "fields": [
+    {
+      "fieldName": "rating",
+      "fieldType": "RatingType",
+      "fieldValidateRules": ["required"],
+      "fieldValues": "ONE,TWO,THREE,FOUR,FIVE"
+    },
+    {
+      "fieldName": "author",
+      "fieldType": "String",
+      "fieldValidateRules": ["required"]
+    },
+    {
+      "fieldName": "comment",
+      "fieldType": "TextBlob"
+    },
+    {
+      "fieldName": "status",
+      "fieldType": "ReviewStatus",
+      "fieldValidateRules": ["required"],
+      "fieldValues": "PENDING,APPROVED,REJECTED"
+    },
+    {
+      "fieldName": "createdAt",
+      "fieldType": "Instant",
+      "fieldValidateRules": ["required"]
+    }
+  ],
+  "name": "ProductReview",
+  "pagination": "pagination",
+  "relationships": [
+    {
+      "otherEntityField": "name",
+      "otherEntityName": "product",
+      "otherEntityRelationshipName": "reviews",
+      "relationshipName": "product",
+      "relationshipSide": "left",
+      "relationshipType": "many-to-one"
+    }
+  ],
+  "searchEngine": "no",
+  "service": "serviceImpl"
+}

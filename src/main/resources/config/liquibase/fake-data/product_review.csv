@@ -1,0 +1,11 @@
+id;rating;author;comment;status;created_at
+1;ONE;enormously;../fake-data/blob/hipster.txt;APPROVED;2025-11-05T21:24:40
+2;ONE;questionably bob;../fake-data/blob/hipster.txt;APPROVED;2025-11-06T01:24:55
+3;TWO;cemetery awkwardly flight;../fake-data/blob/hipster.txt;REJECTED;2025-11-06T00:08:05
+4;TWO;frenetically;../fake-data/blob/hipster.txt;REJECTED;2025-11-06T02:12:34
+5;TWO;pop aggravating;../fake-data/blob/hipster.txt;APPROVED;2025-11-05T18:44:39
+6;THREE;gape oof lobster;../fake-data/blob/hipster.txt;PENDING;2025-11-06T08:49:54
+7;FIVE;supposing;../fake-data/blob/hipster.txt;APPROVED;2025-11-05T13:42:23
+8;THREE;furthermore;../fake-data/blob/hipster.txt;PENDING;2025-11-05T18:09:45
+9;THREE;openly yet;../fake-data/blob/hipster.txt;REJECTED;2025-11-06T00:18:32
+10;ONE;although;../fake-data/blob/hipster.txt;PENDING;2025-11-05T22:30:54

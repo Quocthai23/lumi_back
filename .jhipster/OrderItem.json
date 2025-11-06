@@ -1,0 +1,48 @@
+{
+  "annotations": {
+    "changelogDate": "20251106112914"
+  },
+  "applications": ["lumiere"],
+  "documentation": "Một mặt hàng trong đơn hàng.\\nFrontend: src/types/order.ts",
+  "dto": "mapstruct",
+  "fields": [
+    {
+      "fieldName": "quantity",
+      "fieldType": "Integer",
+      "fieldValidateRules": ["required", "min"],
+      "fieldValidateRulesMin": "1"
+    },
+    {
+      "fieldName": "unitPrice",
+      "fieldType": "BigDecimal",
+      "fieldValidateRules": ["required", "min"],
+      "fieldValidateRulesMin": "0"
+    },
+    {
+      "fieldName": "totalPrice",
+      "fieldType": "BigDecimal",
+      "fieldValidateRules": ["required", "min"],
+      "fieldValidateRulesMin": "0"
+    }
+  ],
+  "name": "OrderItem",
+  "relationships": [
+    {
+      "otherEntityField": "code",
+      "otherEntityName": "orders",
+      "otherEntityRelationshipName": "orderItems",
+      "relationshipName": "order",
+      "relationshipSide": "left",
+      "relationshipType": "many-to-one"
+    },
+    {
+      "otherEntityField": "sku",
+      "otherEntityName": "productVariant",
+      "relationshipName": "productVariant",
+      "relationshipSide": "left",
+      "relationshipType": "many-to-one"
+    }
+  ],
+  "searchEngine": "no",
+  "service": "serviceImpl"
+}

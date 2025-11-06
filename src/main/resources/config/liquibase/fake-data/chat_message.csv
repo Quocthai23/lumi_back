@@ -1,0 +1,11 @@
+id;sender;text;timestamp
+1;USER;../fake-data/blob/hipster.txt;2025-11-05T19:45:44
+2;USER;../fake-data/blob/hipster.txt;2025-11-05T22:17:10
+3;USER;../fake-data/blob/hipster.txt;2025-11-06T01:10:51
+4;USER;../fake-data/blob/hipster.txt;2025-11-05T22:25:05
+5;USER;../fake-data/blob/hipster.txt;2025-11-06T01:41:18
+6;BOT;../fake-data/blob/hipster.txt;2025-11-06T07:03:59
+7;USER;../fake-data/blob/hipster.txt;2025-11-06T08:45:07
+8;USER;../fake-data/blob/hipster.txt;2025-11-05T19:56:55
+9;BOT;../fake-data/blob/hipster.txt;2025-11-05T23:01:42
+10;BOT;../fake-data/blob/hipster.txt;2025-11-05T13:30:29

@@ -1,0 +1,46 @@
+{
+  "annotations": {
+    "changelogDate": "20251106113614"
+  },
+  "applications": ["lumiere"],
+  "documentation": "Một sản phẩm trong sự kiện Flash Sale.\\nFrontend: src/types/flashSale.ts (FlashSaleProductInfo)",
+  "dto": "mapstruct",
+  "fields": [
+    {
+      "fieldName": "salePrice",
+      "fieldType": "BigDecimal",
+      "fieldValidateRules": ["required", "min"],
+      "fieldValidateRulesMin": "0"
+    },
+    {
+      "fieldName": "quantity",
+      "fieldType": "Integer",
+      "fieldValidateRules": ["required"]
+    },
+    {
+      "fieldName": "sold",
+      "fieldType": "Integer",
+      "fieldValidateRules": ["required"]
+    }
+  ],
+  "name": "FlashSaleProduct",
+  "relationships": [
+    {
+      "otherEntityField": "name",
+      "otherEntityName": "flashSale",
+      "otherEntityRelationshipName": "products",
+      "relationshipName": "flashSale",
+      "relationshipSide": "left",
+      "relationshipType": "many-to-one"
+    },
+    {
+      "otherEntityField": "name",
+      "otherEntityName": "product",
+      "relationshipName": "product",
+      "relationshipSide": "left",
+      "relationshipType": "many-to-one"
+    }
+  ],
+  "searchEngine": "no",
+  "service": "serviceImpl"
+}

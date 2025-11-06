@@ -1,0 +1,404 @@
+/**
+ * =================================================================================
+ * JDL (JHipster Domain Language) cho Lumiere Fashion Store
+ * =================================================================================
+ * File JDL này được thiết kế lại dựa trên phân tích mã nguồn React frontend.
+ * Nó tập trung vào các thực thể E-commerce cốt lõi và các mối quan hệ
+ * được định nghĩa trong thư mục /src/types, /src/pages, và /src/contexts.
+ *
+ * v3: Sửa lỗi cú pháp 'pagination' (keyword phải là 'paginate' cho JHipster v8+)
+ */
+
+/* ========================================================================== */
+/* Cấu hình Ứng dụng                               */
+/* ========================================================================== */
+application {
+  config {
+    baseName lumiere
+    applicationType monolith
+    packageName com.lumiere.app
+    authenticationType jwt
+    cacheProvider caffeine
+    enableHibernateCache true
+    databaseType sql
+    devDatabaseType mysql
+    prodDatabaseType mysql
+    buildTool maven
+    serviceDiscoveryType no
+    clientFramework react
+    withAdminUi true
+    nativeLanguage en
+    languages [en, vi]
+  }
+  entities *
+}
+
+
+/* ========================================================================== */
+/* ENUMS (Các kiểu dữ liệu liệt kê)                     */
+/* ========================================================================== */
+
+// Sản phẩm & Kho
+enum ProductStatus { ACTIVE, INACTIVE, DRAFT }
+enum StockMovementReason { SALE, RETURN, ADJUSTMENT, INITIAL_STOCK }
+
+// Đơn hàng & Khách hàng
+enum OrderStatus { PENDING, CONFIRMED, PROCESSING, SHIPPING, DELIVERED, COMPLETED, CANCELLED, DRAFT }
+enum PaymentStatus { UNPAID, PAID, REFUNDED }
+enum CustomerTier { BRONZE, SILVER, GOLD }
+enum LoyaltyTransactionType { EARNED, REDEEMED, ADJUSTMENT }
+
+// Khuyến mãi
+enum VoucherType { PERCENTAGE, FIXED_AMOUNT }
+enum VoucherStatus { ACTIVE, INACTIVE, EXPIRED }
+
+// Tương tác & Thông báo
+enum ReviewStatus { PENDING, APPROVED, REJECTED }
+enum QuestionStatus { PENDING, ANSWERED, HIDDEN }
+enum NotificationType {
+    // Thông báo cho Khách hàng
+    ORDER_UPDATE, NEW_ANSWER, PROMOTION,
+    // Thông báo cho Admin
+    NEW_ORDER, NEW_CUSTOMER, NEW_QA, LOW_STOCK
+}
+enum MessageSender { USER, BOT }
+enum RatingType { ONE, TWO, THREE, FOUR, FIVE }
+
+
+/* ========================================================================== */
+/* Các Thực thể E-COMMERCE Cốt lõi                  */
+/* ========================================================================== */
+
+/**
+ * Thực thể Product, đại diện cho một mặt hàng.
+ * Frontend: src/types/product.ts
+ * @filter
+ */
+entity Product {
+    code String required unique minlength(3) maxlength(64)
+    name String required minlength(2) maxlength(200)
+    slug String required unique minlength(2)
+    description TextBlob
+    status ProductStatus required
+    category String
+    material String
+    averageRating Double min(0) max(5)
+    reviewCount Integer min(0)
+    images TextBlob // Lưu JSON array của URLs
+    createdAt Instant required
+    updatedAt Instant
+}
+
+/**
+ * Biến thể của sản phẩm (ví dụ: size, màu sắc).
+ * Frontend: src/types/product.ts
+ * @filter
+ */
+entity ProductVariant {
+    sku String required unique minlength(3) maxlength(64)
+    name String required minlength(2) maxlength(255)
+    price BigDecimal required min(0)
+    compareAtPrice BigDecimal min(0)
+    currency String maxlength(3)
+    stockQuantity Long required min(0) // Tổng tồn kho
+    isDefault Boolean required
+    color String
+    size String
+}
+
+/**
+ * Bộ sưu tập (Shop The Look).
+ * Frontend: src/types/collection.ts
+ */
+entity Collection {
+    name String required unique
+    slug String required unique
+    description TextBlob
+    imageUrl String
+    lookImageUrl String // Ảnh "Shop the Look"
+}
+
+/**
+ * Hồ sơ khách hàng, liên kết với User của JHipster.
+ * Frontend: src/types/customer.ts
+ * @filter
+ */
+entity Customer {
+    firstName String
+    lastName String
+    phone String
+    tier CustomerTier
+    loyaltyPoints Integer min(0)
+}
+
+/**
+ * Địa chỉ giao hàng của khách hàng.
+ * Frontend: src/types/address.ts
+ */
+entity Address {
+    fullName String required
+    phone String required
+    street String required
+    city String required
+    isDefault Boolean required
+}
+
+/**
+ * Đơn hàng của khách hàng.
+ * Frontend: src/types/order.ts
+ * @filter
+ */
+entity Orders {
+    code String required unique
+    status OrderStatus required
+    paymentStatus PaymentStatus required
+    totalAmount BigDecimal required min(0)
+    note String maxlength(500)
+    paymentMethod String
+    placedAt Instant required
+    redeemedPoints Integer min(0)
+}
+
+/**
+ * Một mặt hàng trong đơn hàng.
+ * Frontend: src/types/order.ts
+ */
+entity OrderItem {
+    quantity Integer required min(1)
+    unitPrice BigDecimal required min(0)
+    totalPrice BigDecimal required min(0)
+}
+
+/**
+ * Lịch sử thay đổi trạng thái đơn hàng.
+ * Frontend: src/types/order.ts
+ */
+entity OrderStatusHistory {
+    status OrderStatus required
+    description String
+    timestamp Instant required
+}
+
+
+/* ========================================================================== */
+/* Thực thể Kho hàng & Tồn kho                      */
+/* ========================================================================== */
+
+/**
+ * Kho hàng.
+ * Frontend: src/types/warehouse.ts
+ */
+entity Warehouse {
+    name String required unique
+    address String
+    isActive Boolean required
+}
+
+/**
+ * Tồn kho chi tiết: số lượng của 1 biến thể tại 1 kho.
+ * Frontend: src/types/inventory.ts
+ * @filter
+ */
+entity Inventory {
+    stockQuantity Long required min(0)
+}
+
+/**
+ * Lịch sử thay đổi tồn kho (để kiểm toán).
+ */
+entity StockMovement {
+    quantityChange Long required
+    note String
+    reason StockMovementReason required
+    createdAt Instant required
+}
+
+
+/* ========================================================================== */
+/* Thực thể Khuyến mãi & Khách hàng thân thiết          */
+/* ========================================================================== */
+
+/**
+ * Mã giảm giá.
+ * Frontend: src/types/voucher.ts
+ */
+entity Voucher {
+    code String required unique
+    type VoucherType required
+    value BigDecimal required min(0)
+    status VoucherStatus required
+    startDate Instant
+    endDate Instant
+    usageLimit Integer
+    usageCount Integer
+}
+
+/**
+ * Sự kiện Flash Sale.
+ * Frontend: src/types/flashSale.ts
+ */
+entity FlashSale {
+    name String required
+    startTime Instant required
+    endTime Instant required
+}
+
+/**
+ * Một sản phẩm trong sự kiện Flash Sale.
+ * Frontend: src/types/flashSale.ts (FlashSaleProductInfo)
+ */
+entity FlashSaleProduct {
+    salePrice BigDecimal required min(0)
+    quantity Integer required // Tổng số lượng bán
+    sold Integer required     // Số lượng đã bán
+}
+
+/**
+ * Lịch sử điểm thưởng của khách hàng.
+ * Frontend: src/pages/customer/LoyaltyPage.tsx
+ */
+entity LoyaltyTransaction {
+    type LoyaltyTransactionType required
+    points Integer required
+    description String
+    createdAt Instant required
+}
+
+
+/* ========================================================================== */
+/* Thực thể Tương tác & Thông báo                   */
+/* ========================================================================== */
+
+/**
+ * Đánh giá sản phẩm.
+ * Frontend: src/types/product.ts (Review)
+ */
+entity ProductReview {
+    rating RatingType required
+    author String required
+    comment TextBlob
+    status ReviewStatus required
+    createdAt Instant required
+}
+
+/**
+ * Câu hỏi về sản phẩm.
+ * Frontend: src/types/qa.ts (Question)
+ */
+entity ProductQuestion {
+    author String required
+    questionText TextBlob required
+    status QuestionStatus required
+    createdAt Instant required
+}
+
+/**
+ * Trả lời cho câu hỏi.
+ * Frontend: src/types/qa.ts (Answer)
+ */
+entity ProductAnswer {
+    author String required // Admin hoặc Khách hàng
+    answerText TextBlob required
+    createdAt Instant required
+}
+
+/**
+ * Thông báo (cho cả admin và khách hàng).
+ * Frontend: src/types/notification.ts
+ */
+entity Notification {
+    message String required
+    type NotificationType required
+    isRead Boolean required
+    link String
+    createdAt Instant required
+}
+
+/**
+ * Đăng ký nhận thông báo khi có hàng.
+ * Frontend: src/types/stockNotification.ts
+ */
+entity StockNotification {
+    email String required
+    notified Boolean required
+    createdAt Instant required
+}
+
+/**
+ * Phiên chat.
+ * Frontend: src/types/chat.ts
+ */
+entity ChatSession {
+    customerId String // ID khách hàng hoặc ID phiên chat
+    createdAt Instant required
+}
+
+/**
+ * Tin nhắn trong phiên chat.
+ * Frontend: src/types/chat.ts
+ */
+entity ChatMessage {
+    sender MessageSender required
+    text TextBlob required
+    timestamp Instant required
+}
+
+
+/* ========================================================================== */
+/* Mối quan hệ (RELATIONSHIPS)                     */
+/* ========================================================================== */
+
+relationship OneToOne {
+    // Mỗi User JHipster sẽ có một hồ sơ Customer
+    Customer{user(login)} to User with builtInEntity
+}
+
+relationship ManyToOne {
+    ProductVariant{product(name)} to Product{variants},
+    OrderItem{order(code)} to Orders{orderItems},
+    OrderItem{productVariant(sku)} to ProductVariant,
+    OrderStatusHistory{order(code)} to Orders{orderStatusHistory},
+    Address{customer(firstName)} to Customer{addresses},
+    Inventory{productVariant(sku)} to ProductVariant,
+    Inventory{warehouse(name)} to Warehouse,
+    StockMovement{productVariant(sku)} to ProductVariant,
+    StockMovement{warehouse(name)} to Warehouse,
+    LoyaltyTransaction{customer(firstName)} to Customer{loyaltyHistory},
+    ProductReview{product(name)} to Product{reviews},
+    ProductQuestion{product(name)} to Product{questions},
+    ProductAnswer{question(questionText)} to ProductQuestion{answers},
+    StockNotification{productVariant(sku)} to ProductVariant,
+    ChatMessage{session(id)} to ChatSession{messages},
+    FlashSaleProduct{flashSale(name)} to FlashSale{products},
+    FlashSaleProduct{product(name)} to Product,
+    Notification{customer(firstName)} to Customer{notifications}
+}
+
+relationship OneToMany {
+    Customer{orders(code)} to Orders{customer(firstName)}
+}
+
+relationship ManyToMany {
+    // 'products' là tên trường trong 'Collection', 'collections' là tên trường trong 'Product'
+    Collection{products(name)} to Product{collections(name)},
+    // 'wishlist' là tên trường trong 'Customer', 'wishlistedBy' là tên trường trong 'Product'
+    Customer{wishlist(name)} to Product{wishlistedBy(firstName)}
+}
+
+
+/* ========================================================================== */
+/* Tùy chọn JHipster (Options)                       */
+/* ========================================================================== */
+
+// Sử dụng DTO (Data Transfer Objects) cho tất cả các API
+dto * with mapstruct
+
+// Sử dụng Service class (cho logic nghiệp vụ)
+service all with serviceImpl
+
+// Bật phân trang cho các thực thể danh sách
+// SỬA LỖI V3: Đổi từ khóa `pagination` (sai) về `paginate` (đúng cho JHipster v8)
+paginate Product, Orders, Customer, ProductReview, ProductQuestion, Collection, Warehouse, Inventory with pagination
+
+// Bật bộ lọc (filter) cho các thực thể chính
+filter Product, ProductVariant, Orders, Customer, Warehouse, Inventory

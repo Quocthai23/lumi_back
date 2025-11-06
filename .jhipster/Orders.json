@@ -1,0 +1,83 @@
+{
+  "annotations": {
+    "changelogDate": "20251106112814"
+  },
+  "applications": ["lumiere"],
+  "documentation": "Đơn hàng của khách hàng.\\nFrontend: src/types/order.ts\\n@filter",
+  "dto": "mapstruct",
+  "fields": [
+    {
+      "fieldName": "code",
+      "fieldType": "String",
+      "fieldValidateRules": ["required", "unique"]
+    },
+    {
+      "fieldName": "status",
+      "fieldType": "OrderStatus",
+      "fieldValidateRules": ["required"],
+      "fieldValues": "PENDING,CONFIRMED,PROCESSING,SHIPPING,DELIVERED,COMPLETED,CANCELLED,DRAFT"
+    },
+    {
+      "fieldName": "paymentStatus",
+      "fieldType": "PaymentStatus",
+      "fieldValidateRules": ["required"],
+      "fieldValues": "UNPAID,PAID,REFUNDED"
+    },
+    {
+      "fieldName": "totalAmount",
+      "fieldType": "BigDecimal",
+      "fieldValidateRules": ["required", "min"],
+      "fieldValidateRulesMin": "0"
+    },
+    {
+      "fieldName": "note",
+      "fieldType": "String",
+      "fieldValidateRules": ["maxlength"],
+      "fieldValidateRulesMaxlength": "500"
+    },
+    {
+      "fieldName": "paymentMethod",
+      "fieldType": "String"
+    },
+    {
+      "fieldName": "placedAt",
+      "fieldType": "Instant",
+      "fieldValidateRules": ["required"]
+    },
+    {
+      "fieldName": "redeemedPoints",
+      "fieldType": "Integer",
+      "fieldValidateRules": ["min"],
+      "fieldValidateRulesMin": "0"
+    }
+  ],
+  "jpaMetamodelFiltering": true,
+  "name": "Orders",
+  "pagination": "pagination",
+  "relationships": [
+    {
+      "otherEntityField": "firstName",
+      "otherEntityName": "customer",
+      "otherEntityRelationshipName": "orders",
+      "relationshipName": "customer",
+      "relationshipSide": "right",
+      "relationshipType": "many-to-one"
+    },
+    {
+      "otherEntityName": "orderItem",
+      "otherEntityRelationshipName": "order",
+      "relationshipName": "orderItems",
+      "relationshipSide": "right",
+      "relationshipType": "one-to-many"
+    },
+    {
+      "otherEntityName": "orderStatusHistory",
+      "otherEntityRelationshipName": "order",
+      "relationshipName": "orderStatusHistory",
+      "relationshipSide": "right",
+      "relationshipType": "one-to-many"
+    }
+  ],
+  "searchEngine": "no",
+  "service": "serviceImpl"
+}

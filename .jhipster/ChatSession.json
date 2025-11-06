@@ -1,0 +1,31 @@
+{
+  "annotations": {
+    "changelogDate": "20251106114314"
+  },
+  "applications": ["lumiere"],
+  "documentation": "Phiên chat.\\nFrontend: src/types/chat.ts",
+  "dto": "mapstruct",
+  "fields": [
+    {
+      "fieldName": "customerId",
+      "fieldType": "String"
+    },
+    {
+      "fieldName": "createdAt",
+      "fieldType": "Instant",
+      "fieldValidateRules": ["required"]
+    }
+  ],
+  "name": "ChatSession",
+  "relationships": [
+    {
+      "otherEntityName": "chatMessage",
+      "otherEntityRelationshipName": "session",
+      "relationshipName": "messages",
+      "relationshipSide": "right",
+      "relationshipType": "one-to-many"
+    }
+  ],
+  "searchEngine": "no",
+  "service": "serviceImpl"
+}

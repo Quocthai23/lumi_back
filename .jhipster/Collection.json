@@ -1,0 +1,46 @@
+{
+  "annotations": {
+    "changelogDate": "20251106112514"
+  },
+  "applications": ["lumiere"],
+  "documentation": "Bộ sưu tập (Shop The Look).\\nFrontend: src/types/collection.ts",
+  "dto": "mapstruct",
+  "fields": [
+    {
+      "fieldName": "name",
+      "fieldType": "String",
+      "fieldValidateRules": ["required", "unique"]
+    },
+    {
+      "fieldName": "slug",
+      "fieldType": "String",
+      "fieldValidateRules": ["required", "unique"]
+    },
+    {
+      "fieldName": "description",
+      "fieldType": "TextBlob"
+    },
+    {
+      "fieldName": "imageUrl",
+      "fieldType": "String"
+    },
+    {
+      "fieldName": "lookImageUrl",
+      "fieldType": "String"
+    }
+  ],
+  "name": "Collection",
+  "pagination": "pagination",
+  "relationships": [
+    {
+      "otherEntityField": "name",
+      "otherEntityName": "product",
+      "otherEntityRelationshipName": "collections",
+      "relationshipName": "products",
+      "relationshipSide": "left",
+      "relationshipType": "many-to-many"
+    }
+  ],
+  "searchEngine": "no",
+  "service": "serviceImpl"
+}

@@ -1,0 +1,37 @@
+{
+  "annotations": {
+    "changelogDate": "20251106113514"
+  },
+  "applications": ["lumiere"],
+  "documentation": "Sự kiện Flash Sale.\\nFrontend: src/types/flashSale.ts",
+  "dto": "mapstruct",
+  "fields": [
+    {
+      "fieldName": "name",
+      "fieldType": "String",
+      "fieldValidateRules": ["required"]
+    },
+    {
+      "fieldName": "startTime",
+      "fieldType": "Instant",
+      "fieldValidateRules": ["required"]
+    },
+    {
+      "fieldName": "endTime",
+      "fieldType": "Instant",
+      "fieldValidateRules": ["required"]
+    }
+  ],
+  "name": "FlashSale",
+  "relationships": [
+    {
+      "otherEntityName": "flashSaleProduct",
+      "otherEntityRelationshipName": "flashSale",
+      "relationshipName": "products",
+      "relationshipSide": "right",
+      "relationshipType": "one-to-many"
+    }
+  ],
+  "searchEngine": "no",
+  "service": "serviceImpl"
+}

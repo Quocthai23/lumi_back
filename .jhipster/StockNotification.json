@@ -1,0 +1,37 @@
+{
+  "annotations": {
+    "changelogDate": "20251106114214"
+  },
+  "applications": ["lumiere"],
+  "documentation": "Đăng ký nhận thông báo khi có hàng.\\nFrontend: src/types/stockNotification.ts",
+  "dto": "mapstruct",
+  "fields": [
+    {
+      "fieldName": "email",
+      "fieldType": "String",
+      "fieldValidateRules": ["required"]
+    },
+    {
+      "fieldName": "notified",
+      "fieldType": "Boolean",
+      "fieldValidateRules": ["required"]
+    },
+    {
+      "fieldName": "createdAt",
+      "fieldType": "Instant",
+      "fieldValidateRules": ["required"]
+    }
+  ],
+  "name": "StockNotification",
+  "relationships": [
+    {
+      "otherEntityField": "sku",
+      "otherEntityName": "productVariant",
+      "relationshipName": "productVariant",
+      "relationshipSide": "left",
+      "relationshipType": "many-to-one"
+    }
+  ],
+  "searchEngine": "no",
+  "service": "serviceImpl"
+}

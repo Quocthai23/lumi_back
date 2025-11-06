@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:ext="http://www.liquibase.org/xml/ns/dbchangelog-ext"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd
+                        http://www.liquibase.org/xml/ns/dbchangelog-ext http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-ext.xsd">
+    <!--
+        Added the constraints for entity FlashSaleProduct.
+    -->
+    <changeSet id="20251106113614-2" author="jhipster">
+
+        <addForeignKeyConstraint baseColumnNames="flash_sale_id"
+                                 baseTableName="flash_sale_product"
+                                 constraintName="fk_flash_sale_product__flash_sale_id"
+                                 referencedColumnNames="id"
+                                 referencedTableName="flash_sale"
+                                 />
+
+        <addForeignKeyConstraint baseColumnNames="product_id"
+                                 baseTableName="flash_sale_product"
+                                 constraintName="fk_flash_sale_product__product_id"
+                                 referencedColumnNames="id"
+                                 referencedTableName="product"
+                                 />
+    </changeSet>
+</databaseChangeLog>

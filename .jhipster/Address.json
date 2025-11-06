@@ -1,0 +1,48 @@
+{
+  "annotations": {
+    "changelogDate": "20251106112714"
+  },
+  "applications": ["lumiere"],
+  "documentation": "Địa chỉ giao hàng của khách hàng.\\nFrontend: src/types/address.ts",
+  "dto": "mapstruct",
+  "fields": [
+    {
+      "fieldName": "fullName",
+      "fieldType": "String",
+      "fieldValidateRules": ["required"]
+    },
+    {
+      "fieldName": "phone",
+      "fieldType": "String",
+      "fieldValidateRules": ["required"]
+    },
+    {
+      "fieldName": "street",
+      "fieldType": "String",
+      "fieldValidateRules": ["required"]
+    },
+    {
+      "fieldName": "city",
+      "fieldType": "String",
+      "fieldValidateRules": ["required"]
+    },
+    {
+      "fieldName": "isDefault",
+      "fieldType": "Boolean",
+      "fieldValidateRules": ["required"]
+    }
+  ],
+  "name": "Address",
+  "relationships": [
+    {
+      "otherEntityField": "firstName",
+      "otherEntityName": "customer",
+      "otherEntityRelationshipName": "addresses",
+      "relationshipName": "customer",
+      "relationshipSide": "left",
+      "relationshipType": "many-to-one"
+    }
+  ],
+  "searchEngine": "no",
+  "service": "serviceImpl"
+}

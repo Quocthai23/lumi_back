@@ -1,0 +1,85 @@
+{
+  "annotations": {
+    "changelogDate": "20251106112614"
+  },
+  "applications": ["lumiere"],
+  "documentation": "Hồ sơ khách hàng, liên kết với User của JHipster.\\nFrontend: src/types/customer.ts\\n@filter",
+  "dto": "mapstruct",
+  "fields": [
+    {
+      "fieldName": "firstName",
+      "fieldType": "String"
+    },
+    {
+      "fieldName": "lastName",
+      "fieldType": "String"
+    },
+    {
+      "fieldName": "phone",
+      "fieldType": "String"
+    },
+    {
+      "fieldName": "tier",
+      "fieldType": "CustomerTier",
+      "fieldValues": "BRONZE,SILVER,GOLD"
+    },
+    {
+      "fieldName": "loyaltyPoints",
+      "fieldType": "Integer",
+      "fieldValidateRules": ["min"],
+      "fieldValidateRulesMin": "0"
+    }
+  ],
+  "jpaMetamodelFiltering": true,
+  "name": "Customer",
+  "pagination": "pagination",
+  "relationships": [
+    {
+      "otherEntityField": "login",
+      "otherEntityName": "user",
+      "relationshipName": "user",
+      "relationshipSide": "left",
+      "relationshipType": "one-to-one",
+      "relationshipWithBuiltInEntity": true
+    },
+    {
+      "otherEntityField": "code",
+      "otherEntityName": "orders",
+      "otherEntityRelationshipName": "customer",
+      "relationshipName": "orders",
+      "relationshipSide": "left",
+      "relationshipType": "one-to-many"
+    },
+    {
+      "otherEntityField": "name",
+      "otherEntityName": "product",
+      "otherEntityRelationshipName": "wishlistedBy",
+      "relationshipName": "wishlist",
+      "relationshipSide": "left",
+      "relationshipType": "many-to-many"
+    },
+    {
+      "otherEntityName": "address",
+      "otherEntityRelationshipName": "customer",
+      "relationshipName": "addresses",
+      "relationshipSide": "right",
+      "relationshipType": "one-to-many"
+    },
+    {
+      "otherEntityName": "loyaltyTransaction",
+      "otherEntityRelationshipName": "customer",
+      "relationshipName": "loyaltyHistory",
+      "relationshipSide": "right",
+      "relationshipType": "one-to-many"
+    },
+    {
+      "otherEntityName": "notification",
+      "otherEntityRelationshipName": "customer",
+      "relationshipName": "notifications",
+      "relationshipSide": "right",
+      "relationshipType": "one-to-many"
+    }
+  ],
+  "searchEngine": "no",
+  "service": "serviceImpl"
+}

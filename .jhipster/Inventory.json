@@ -1,0 +1,37 @@
+{
+  "annotations": {
+    "changelogDate": "20251106113214"
+  },
+  "applications": ["lumiere"],
+  "documentation": "Tồn kho chi tiết: số lượng của 1 biến thể tại 1 kho.\\nFrontend: src/types/inventory.ts\\n@filter",
+  "dto": "mapstruct",
+  "fields": [
+    {
+      "fieldName": "stockQuantity",
+      "fieldType": "Long",
+      "fieldValidateRules": ["required", "min"],
+      "fieldValidateRulesMin": "0"
+    }
+  ],
+  "jpaMetamodelFiltering": true,
+  "name": "Inventory",
+  "pagination": "pagination",
+  "relationships": [
+    {
+      "otherEntityField": "sku",
+      "otherEntityName": "productVariant",
+      "relationshipName": "productVariant",
+      "relationshipSide": "left",
+      "relationshipType": "many-to-one"
+    },
+    {
+      "otherEntityField": "name",
+      "otherEntityName": "warehouse",
+      "relationshipName": "warehouse",
+      "relationshipSide": "left",
+      "relationshipType": "many-to-one"
+    }
+  ],
+  "searchEngine": "no",
+  "service": "serviceImpl"
+}

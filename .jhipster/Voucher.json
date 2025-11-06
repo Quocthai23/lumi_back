@@ -1,0 +1,53 @@
+{
+  "annotations": {
+    "changelogDate": "20251106113414"
+  },
+  "applications": ["lumiere"],
+  "documentation": "Mã giảm giá.\\nFrontend: src/types/voucher.ts",
+  "dto": "mapstruct",
+  "fields": [
+    {
+      "fieldName": "code",
+      "fieldType": "String",
+      "fieldValidateRules": ["required", "unique"]
+    },
+    {
+      "fieldName": "type",
+      "fieldType": "VoucherType",
+      "fieldValidateRules": ["required"],
+      "fieldValues": "PERCENTAGE,FIXED_AMOUNT"
+    },
+    {
+      "fieldName": "value",
+      "fieldType": "BigDecimal",
+      "fieldValidateRules": ["required", "min"],
+      "fieldValidateRulesMin": "0"
+    },
+    {
+      "fieldName": "status",
+      "fieldType": "VoucherStatus",
+      "fieldValidateRules": ["required"],
+      "fieldValues": "ACTIVE,INACTIVE,EXPIRED"
+    },
+    {
+      "fieldName": "startDate",
+      "fieldType": "Instant"
+    },
+    {
+      "fieldName": "endDate",
+      "fieldType": "Instant"
+    },
+    {
+      "fieldName": "usageLimit",
+      "fieldType": "Integer"
+    },
+    {
+      "fieldName": "usageCount",
+      "fieldType": "Integer"
+    }
+  ],
+  "name": "Voucher",
+  "relationships": [],
+  "searchEngine": "no",
+  "service": "serviceImpl"
+}

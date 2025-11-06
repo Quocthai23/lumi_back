@@ -1,0 +1,52 @@
+{
+  "annotations": {
+    "changelogDate": "20251106113914"
+  },
+  "applications": ["lumiere"],
+  "documentation": "Câu hỏi về sản phẩm.\\nFrontend: src/types/qa.ts (Question)",
+  "dto": "mapstruct",
+  "fields": [
+    {
+      "fieldName": "author",
+      "fieldType": "String",
+      "fieldValidateRules": ["required"]
+    },
+    {
+      "fieldName": "questionText",
+      "fieldType": "TextBlob",
+      "fieldValidateRules": ["required"]
+    },
+    {
+      "fieldName": "status",
+      "fieldType": "QuestionStatus",
+      "fieldValidateRules": ["required"],
+      "fieldValues": "PENDING,ANSWERED,HIDDEN"
+    },
+    {
+      "fieldName": "createdAt",
+      "fieldType": "Instant",
+      "fieldValidateRules": ["required"]
+    }
+  ],
+  "name": "ProductQuestion",
+  "pagination": "pagination",
+  "relationships": [
+    {
+      "otherEntityField": "name",
+      "otherEntityName": "product",
+      "otherEntityRelationshipName": "questions",
+      "relationshipName": "product",
+      "relationshipSide": "left",
+      "relationshipType": "many-to-one"
+    },
+    {
+      "otherEntityName": "productAnswer",
+      "otherEntityRelationshipName": "question",
+      "relationshipName": "answers",
+      "relationshipSide": "right",
+      "relationshipType": "one-to-many"
+    }
+  ],
+  "searchEngine": "no",
+  "service": "serviceImpl"
+}

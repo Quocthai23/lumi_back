@@ -1,0 +1,38 @@
+{
+  "annotations": {
+    "changelogDate": "20251106114014"
+  },
+  "applications": ["lumiere"],
+  "documentation": "Trả lời cho câu hỏi.\\nFrontend: src/types/qa.ts (Answer)",
+  "dto": "mapstruct",
+  "fields": [
+    {
+      "fieldName": "author",
+      "fieldType": "String",
+      "fieldValidateRules": ["required"]
+    },
+    {
+      "fieldName": "answerText",
+      "fieldType": "TextBlob",
+      "fieldValidateRules": ["required"]
+    },
+    {
+      "fieldName": "createdAt",
+      "fieldType": "Instant",
+      "fieldValidateRules": ["required"]
+    }
+  ],
+  "name": "ProductAnswer",
+  "relationships": [
+    {
+      "otherEntityField": "questionText",
+      "otherEntityName": "productQuestion",
+      "otherEntityRelationshipName": "answers",
+      "relationshipName": "question",
+      "relationshipSide": "left",
+      "relationshipType": "many-to-one"
+    }
+  ],
+  "searchEngine": "no",
+  "service": "serviceImpl"
+}

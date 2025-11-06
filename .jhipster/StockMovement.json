@@ -1,0 +1,49 @@
+{
+  "annotations": {
+    "changelogDate": "20251106113314"
+  },
+  "applications": ["lumiere"],
+  "documentation": "Lịch sử thay đổi tồn kho (để kiểm toán).",
+  "dto": "mapstruct",
+  "fields": [
+    {
+      "fieldName": "quantityChange",
+      "fieldType": "Long",
+      "fieldValidateRules": ["required"]
+    },
+    {
+      "fieldName": "note",
+      "fieldType": "String"
+    },
+    {
+      "fieldName": "reason",
+      "fieldType": "StockMovementReason",
+      "fieldValidateRules": ["required"],
+      "fieldValues": "SALE,RETURN,ADJUSTMENT,INITIAL_STOCK"
+    },
+    {
+      "fieldName": "createdAt",
+      "fieldType": "Instant",
+      "fieldValidateRules": ["required"]
+    }
+  ],
+  "name": "StockMovement",
+  "relationships": [
+    {
+      "otherEntityField": "sku",
+      "otherEntityName": "productVariant",
+      "relationshipName": "productVariant",
+      "relationshipSide": "left",
+      "relationshipType": "many-to-one"
+    },
+    {
+      "otherEntityField": "name",
+      "otherEntityName": "warehouse",
+      "relationshipName": "warehouse",
+      "relationshipSide": "left",
+      "relationshipType": "many-to-one"
+    }
+  ],
+  "searchEngine": "no",
+  "service": "serviceImpl"
+}
