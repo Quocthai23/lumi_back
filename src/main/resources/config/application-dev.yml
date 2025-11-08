@@ -15,10 +15,17 @@
 
 logging:
   level:
-    ROOT: DEBUG
+    ROOT: INFO
     tech.jhipster: DEBUG
     org.hibernate.SQL: DEBUG
-    com.lumiere.app: DEBUG
+    com.lumi.app: DEBUG
+    javax.management.remote.rmi: ERROR  # Change this from DEBUG to ERROR
+    org.springframework.boot.actuate: ERROR  # Reduce actuator logs
+
+management:
+  health:
+    elasticsearch:
+      enabled: false
 
 spring:
   devtools:
@@ -32,20 +39,16 @@ spring:
       indent-output: true
   datasource:
     type: com.zaxxer.hikari.HikariDataSource
-    url: jdbc:mysql://localhost:3306/lumiere?useUnicode=true&characterEncoding=utf8&useSSL=false&useLegacyDatetimeCode=false&createDatabaseIfNotExist=true
+    url: jdbc:mysql://localhost:3306/lumiapp?useUnicode=true&characterEncoding=utf8&useSSL=false&allowPublicKeyRetrieval=true
     username: root
-    password:
+    password: 123456
     hikari:
       poolName: Hikari
       auto-commit: false
-      data-source-properties:
-        cachePrepStmts: true
-        prepStmtCacheSize: 250
-        prepStmtCacheSqlLimit: 2048
-        useServerPrepStmts: true
   liquibase:
     # Remove 'faker' if you do not want the sample data to be loaded automatically
     contexts: dev, faker
+    enabled: true
   mail:
     host: localhost
     port: 25
@@ -75,7 +78,7 @@ jhipster:
   # CORS is only enabled by default with the "dev" profile
   cors:
     # Allow Ionic for JHipster by default (* no longer allowed in Spring Boot 2.4+)
-    allowed-origins: 'http://localhost:8100,https://localhost:8100'
+    allowed-origins: 'http://localhost:8100,https://localhost:8100,http://localhost:9000,https://localhost:9000,http://localhost:9060,https://localhost:9060, http://localhost:5173'
     # Enable CORS when running in GitHub Codespaces
     allowed-origin-patterns: 'https://*.githubpreview.dev'
     allowed-methods: '*'
@@ -87,7 +90,7 @@ jhipster:
     authentication:
       jwt:
         # This token must be encoded using Base64 and be at least 256 bits long (you can type `openssl rand -base64 64` on your command line to generate a 512 bits one)
-        base64-secret: YzQ3ZDU5MDRiNTAyODdjNWQ2YTQ2ZmM1MjE3ZDdjOTg2YjUxMDZlNmRmMzM3NGYxM2Q5NDNmZTI2ZDg1Nzg5NTdiNjhhMzEzZjRmM2U1YmEzZmYwZDVlYjM3MmQ3MjNhMGVmYWUyMzU0MzhlNzUzYzg3OGZjMjQ2NWQwNjczNDE=
+        base64-secret: YjkyYTNlYzIzMzViNDMyYjc2ODA4ZDBhYWI4Y2E5ZGUxM2Q1YzA5YmE5MDk2YTUxYjFjMGMyM2RhYjZhNDI3NjQwNjM1MDgxNmY4Mjg0Mjc1Mzg3ODNmMjhlNzg1OWJjODQ1Yjc4YmYwNDdhNTY0ZmM2ZTY3NzY2NDJlM2E3NTg=
         # Token is valid 24 hours
         token-validity-in-seconds: 86400
         token-validity-in-seconds-for-remember-me: 2592000
@@ -110,3 +113,8 @@ jhipster:
 # ===================================================================
 
 # application:
+app:
+  upload:
+    temp-dir: ./uploads/tmp
+    final-dir: ./uploads
+    max-chunk-size: 5MB
