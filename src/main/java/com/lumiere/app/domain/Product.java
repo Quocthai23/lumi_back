@@ -29,19 +29,14 @@ public class Product implements Serializable {
     @Column(name = "id")
     private Long id;
 
-    @NotNull
-    @Size(min = 3, max = 64)
-    @Column(name = "code", length = 64, nullable = false, unique = true)
+    @Column(name = "code")
     private String code;
 
-    @NotNull
-    @Size(min = 2, max = 200)
-    @Column(name = "name", length = 200, nullable = false)
+    @Column(name = "name")
     private String name;
 
-    @NotNull
     @Size(min = 2)
-    @Column(name = "slug", nullable = false, unique = true)
+    @Column(name = "slug")
     private String slug;
 
     @Lob

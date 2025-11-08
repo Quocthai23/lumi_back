@@ -8,15 +8,20 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
+import java.util.*;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Slice;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 import tech.jhipster.web.util.HeaderUtil;
+import tech.jhipster.web.util.PaginationUtil;
 import tech.jhipster.web.util.ResponseUtil;
 
 /**
@@ -171,5 +176,44 @@ public class NotificationResource {
         return ResponseEntity.noContent()
             .headers(HeaderUtil.createEntityDeletionAlert(applicationName, true, ENTITY_NAME, id.toString()))
             .build();
+    }
+
+    /** GET /admin/notifications : phân trang chuẩn (page, size, sort) */
+    @GetMapping("/admin/notifications")
+    public ResponseEntity<List<NotificationDTO>> getAdminNotifications(Pageable pageable) {
+        Page<NotificationDTO> page = notificationService.getAdminNotifications(pageable);
+        // JHipster helper để nhúng Link header (first, prev, next, last)
+        HttpHeaders headers = PaginationUtil
+            .generatePaginationHttpHeaders(ServletUriComponentsBuilder.fromCurrentRequest(), page);
+
+        return ResponseEntity.ok().headers(headers).body(page.getContent());
+    }
+
+    /**
+     * GET /admin/notifications/scroll : infinite scroll (keyset)
+     * @param lastId id cuối cùng của trang trước (null nếu là trang đầu)
+     * @param size số bản ghi lấy mỗi lần (mặc định 20)
+     *
+     * Response gói thêm hasNext và nextCursor để client gọi tiếp
+     */
+    @GetMapping("/admin/notifications/scroll")
+    public ResponseEntity<Map<String, Object>> scrollAdminNotifications(
+        @RequestParam(required = false) Long lastId,
+        @RequestParam(defaultValue = "20") int size
+    ) {
+        Slice<NotificationDTO> slice = notificationService.scrollAdminNotifications(lastId, size);
+
+        Long nextCursor = null;
+        if (!slice.isEmpty()) {
+            NotificationDTO last = slice.getContent().get(slice.getNumberOfElements() - 1);
+            nextCursor = last.getId();
+        }
+
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("items", slice.getContent());
+        payload.put("hasNext", slice.hasNext());
+        payload.put("nextCursor", slice.hasNext() ? nextCursor : null);
+
+        return ResponseEntity.ok(payload);
     }
 }

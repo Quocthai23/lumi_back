@@ -171,4 +171,17 @@ public class OrderItemResource {
             .headers(HeaderUtil.createEntityDeletionAlert(applicationName, true, ENTITY_NAME, id.toString()))
             .build();
     }
+    /**
+     * {@code GET  /order-items/by-order/:orderId} : get all OrderItems of an order.
+     *
+     * @param orderId the id of the order
+     * @return the {@link ResponseEntity} with status {@code 200 (OK)} and the list of order items in body.
+     */
+    @GetMapping("/by-order/{orderId}")
+    public ResponseEntity<List<OrderItemDTO>> getOrderItemsByOrderId(@PathVariable Long orderId) {
+        LOG.debug("REST request to get OrderItems by orderId : {}", orderId);
+        List<OrderItemDTO> orderItems = orderItemService.findAllByOrderId(orderId);
+        return ResponseEntity.ok(orderItems);
+    }
+
 }

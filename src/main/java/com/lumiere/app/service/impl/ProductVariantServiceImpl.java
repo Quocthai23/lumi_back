@@ -5,7 +5,11 @@ import com.lumiere.app.repository.ProductVariantRepository;
 import com.lumiere.app.service.ProductVariantService;
 import com.lumiere.app.service.dto.ProductVariantDTO;
 import com.lumiere.app.service.mapper.ProductVariantMapper;
+
+import java.util.List;
 import java.util.Optional;
+
+import com.lumiere.app.utils.MergeUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
@@ -48,15 +52,20 @@ public class ProductVariantServiceImpl implements ProductVariantService {
     }
 
     @Override
-    public Optional<ProductVariantDTO> partialUpdate(ProductVariantDTO productVariantDTO) {
-        LOG.debug("Request to partially update ProductVariant : {}", productVariantDTO);
+    public Optional<ProductVariantDTO> partialUpdate(ProductVariantDTO dto) {
 
         return productVariantRepository
-            .findById(productVariantDTO.getId())
-            .map(existingProductVariant -> {
-                productVariantMapper.partialUpdate(existingProductVariant, productVariantDTO);
+            .findById(dto.getId())
+            .map(existing -> {
+                ProductVariant incoming = productVariantMapper.toEntity(dto);
 
-                return existingProductVariant;
+                MergeUtils.Options opts = new MergeUtils.Options()
+                    .overwriteNulls(false)
+                    .replaceCollections(false);
+
+                MergeUtils.merge(incoming, existing, opts);
+
+                return existing;
             })
             .map(productVariantRepository::save)
             .map(productVariantMapper::toDto);
@@ -77,5 +86,23 @@ public class ProductVariantServiceImpl implements ProductVariantService {
     public void delete(Long id) {
         LOG.debug("Request to delete ProductVariant : {}", id);
         productVariantRepository.deleteById(id);
+    }
+
+    @Override
+    public List<ProductVariantDTO> findByProductId(Long productId){
+        return productVariantMapper.toDto(productVariantRepository.findByProduct_Id(productId));
+    }
+
+    @Override
+    public void setIsDefault(Long variantId, Long productId){
+               List<ProductVariantDTO> variants = this.findByProductId(productId);
+               variants.forEach(v ->  {
+                   if(!v.getId().equals(variantId)){
+                       v.setIsDefault(false);
+                   }else{
+                       v.setIsDefault(true);
+                   }
+               });
+               productVariantRepository.saveAll(variants.stream().map(productVariantMapper::toEntity).toList());
     }
 }

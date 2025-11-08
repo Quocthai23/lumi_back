@@ -42,6 +42,8 @@ public interface AttachmentService {
      */
     List<AttachmentDTO> findAll();
 
+    List<AttachmentDTO> findAllByIdIn(List<Long> ids);
+
     /**
      * Get the "id" attachment.
      *
@@ -57,5 +59,5 @@ public interface AttachmentService {
      */
     void delete(Long id);
 
-    Blob uploadAttachment(MultipartFile file) throws IOException;
+    void uploadAttachment(MultipartFile file, AttachmentDTO attachmentDTO) throws IOException;
 }

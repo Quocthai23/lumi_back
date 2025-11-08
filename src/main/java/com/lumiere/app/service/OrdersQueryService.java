@@ -16,6 +16,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tech.jhipster.service.QueryService;
 
+import java.util.Optional;
+
 /**
  * Service for executing complex queries for {@link Orders} entities in the database.
  * The main input is a {@link OrdersCriteria} which gets converted to {@link Specification},
@@ -91,4 +93,6 @@ public class OrdersQueryService extends QueryService<Orders> {
         }
         return specification;
     }
+
+
 }

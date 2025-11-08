@@ -2,6 +2,8 @@ package com.lumiere.app.service;
 
 import com.lumiere.app.service.dto.OrdersDTO;
 import java.util.Optional;
+
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
@@ -55,4 +57,6 @@ public interface OrdersService {
      * @param id the id of the entity.
      */
     void delete(Long id);
+
+    void writeOrderInvoiceExcel(Long orderId, HttpServletResponse response);
 }

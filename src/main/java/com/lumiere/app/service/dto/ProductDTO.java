@@ -1,5 +1,6 @@
 package com.lumiere.app.service.dto;
 
+import com.lumiere.app.domain.ProductAttachment;
 import com.lumiere.app.domain.enumeration.ProductStatus;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.persistence.Lob;
@@ -19,22 +20,15 @@ public class ProductDTO implements Serializable {
 
     private Long id;
 
-    @NotNull
-    @Size(min = 3, max = 64)
     private String code;
 
-    @NotNull
-    @Size(min = 2, max = 200)
     private String name;
 
-    @NotNull
-    @Size(min = 2)
     private String slug;
 
     @Lob
     private String description;
 
-    @NotNull
     private ProductStatus status;
 
     private String category;
@@ -51,10 +45,30 @@ public class ProductDTO implements Serializable {
     @Lob
     private String images;
 
-    @NotNull
     private Instant createdAt;
 
     private Instant updatedAt;
+
+
+    private Set<AttachmentDTO> attachmentDTOS;
+
+    public Set<AttachmentDTO> getAttachmentDTOS() {
+        return attachmentDTOS;
+    }
+
+    public void setAttachmentDTOS(Set<AttachmentDTO> attachmentDTOS) {
+        this.attachmentDTOS = attachmentDTOS;
+    }
+
+    private Set<ProductAttachment> productAttachments = new HashSet<>();
+
+    public Set<ProductAttachment> getProductAttachments() {
+        return productAttachments;
+    }
+
+    public void setProductAttachments(Set<ProductAttachment> productAttachments) {
+        this.productAttachments = productAttachments;
+    }
 
     private Set<CollectionDTO> collections = new HashSet<>();
 

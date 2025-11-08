@@ -1,6 +1,8 @@
 package com.lumiere.app.service;
 
 import com.lumiere.app.service.dto.ProductVariantDTO;
+
+import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -55,4 +57,8 @@ public interface ProductVariantService {
      * @param id the id of the entity.
      */
     void delete(Long id);
+
+    List<ProductVariantDTO> findByProductId(Long productId);
+
+    void setIsDefault(Long variantId, Long productId);
 }

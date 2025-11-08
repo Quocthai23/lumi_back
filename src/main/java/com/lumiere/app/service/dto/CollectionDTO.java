@@ -17,10 +17,8 @@ public class CollectionDTO implements Serializable {
 
     private Long id;
 
-    @NotNull
     private String name;
 
-    @NotNull
     private String slug;
 
     @Lob

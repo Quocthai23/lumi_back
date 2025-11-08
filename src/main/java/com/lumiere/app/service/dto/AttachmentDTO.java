@@ -23,8 +23,6 @@ public class AttachmentDTO implements Serializable {
     @Size(max = 200)
     private String name;
 
-    @NotNull
-    @Size(max = 512)
     private String url;
 
     @Size(max = 128)

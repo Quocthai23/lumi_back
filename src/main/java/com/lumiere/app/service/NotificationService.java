@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Slice;
 
 /**
  * Service Interface for managing {@link com.lumiere.app.domain.Notification}.
@@ -63,4 +64,8 @@ public interface NotificationService {
      * @param id the id of the entity.
      */
     void delete(Long id);
+
+    Page<NotificationDTO> getAdminNotifications(Pageable pageable);
+
+    Slice<NotificationDTO> scrollAdminNotifications(Long lastId, int size);
 }

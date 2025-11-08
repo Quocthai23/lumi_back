@@ -38,8 +38,6 @@ public class Attachment implements Serializable {
     private String name;
 
     @NotNull
-    @Size(max = 512)
-    @Column(name = "url", length = 512, nullable = false)
     private String url;
 
     @Size(max = 128)

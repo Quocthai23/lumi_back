@@ -3,6 +3,8 @@ package com.lumiere.app.repository;
 import com.lumiere.app.domain.Inventory;
 import java.util.List;
 import java.util.Optional;
+
+import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.*;
@@ -27,8 +29,11 @@ public interface InventoryRepository extends JpaRepository<Inventory, Long>, Jpa
     }
 
     @Query(
-        value = "select inventory from Inventory inventory left join fetch inventory.productVariant left join fetch inventory.warehouse",
-        countQuery = "select count(inventory) from Inventory inventory"
+        value = "select distinct inventory " +
+            "from Inventory inventory " +
+            "left join fetch inventory.productVariant " +
+            "left join fetch inventory.warehouse",
+        countQuery = "select count(distinct inventory) from Inventory inventory"
     )
     Page<Inventory> findAllWithToOneRelationships(Pageable pageable);
 
@@ -39,4 +44,10 @@ public interface InventoryRepository extends JpaRepository<Inventory, Long>, Jpa
         "select inventory from Inventory inventory left join fetch inventory.productVariant left join fetch inventory.warehouse where inventory.id =:id"
     )
     Optional<Inventory> findOneWithToOneRelationships(@Param("id") Long id);
+
+    List<Inventory> findAllByProductVariant_IdIn(List<Long> productVariantIds);
+
+    @Query("select i from Inventory i where i.id in :ids")
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    List<Inventory> findAllByIdForUpdate(@Param("ids") List<Long> ids);
 }

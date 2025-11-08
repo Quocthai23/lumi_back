@@ -65,7 +65,7 @@ public class ProductResource {
         if (productDTO.getId() != null) {
             throw new BadRequestAlertException("A new product cannot already have an ID", ENTITY_NAME, "idexists");
         }
-        productDTO = productService.save(productDTO);
+        productDTO = productService.createProductDTO(productDTO);
         return ResponseEntity.created(new URI("/api/products/" + productDTO.getId()))
             .headers(HeaderUtil.createEntityCreationAlert(applicationName, true, ENTITY_NAME, productDTO.getId().toString()))
             .body(productDTO);

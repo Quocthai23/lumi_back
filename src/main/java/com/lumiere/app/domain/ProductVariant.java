@@ -26,35 +26,24 @@ public class ProductVariant implements Serializable {
     @Column(name = "id")
     private Long id;
 
-    @NotNull
-    @Size(min = 3, max = 64)
     @Column(name = "sku", length = 64, nullable = false, unique = true)
     private String sku;
 
-    @NotNull
-    @Size(min = 2, max = 255)
     @Column(name = "name", length = 255, nullable = false)
     private String name;
 
-    @NotNull
-    @DecimalMin(value = "0")
     @Column(name = "price", precision = 21, scale = 2, nullable = false)
     private BigDecimal price;
 
-    @DecimalMin(value = "0")
     @Column(name = "compare_at_price", precision = 21, scale = 2)
     private BigDecimal compareAtPrice;
 
-    @Size(max = 3)
     @Column(name = "currency", length = 3)
     private String currency;
 
-    @NotNull
-    @Min(value = 0L)
     @Column(name = "stock_quantity", nullable = false)
     private Long stockQuantity;
 
-    @NotNull
     @Column(name = "is_default", nullable = false)
     private Boolean isDefault;
 
@@ -68,7 +57,26 @@ public class ProductVariant implements Serializable {
     @JsonIgnoreProperties(value = { "variants", "reviews", "questions", "collections", "wishlistedBies" }, allowSetters = true)
     private Product product;
 
-    // jhipster-needle-entity-add-field - JHipster will add fields here
+    @Column(name = "url_image", length = 1000, nullable = false)
+    private String urlImage;
+
+    public Boolean getDefault() {
+        return isDefault;
+    }
+
+    public void setDefault(Boolean aDefault) {
+        isDefault = aDefault;
+    }
+
+    public String getUrlImage() {
+        return urlImage;
+    }
+
+    public void setUrlImage(String urlImage) {
+        this.urlImage = urlImage;
+    }
+
+// jhipster-needle-entity-add-field - JHipster will add fields here
 
     public Long getId() {
         return this.id;

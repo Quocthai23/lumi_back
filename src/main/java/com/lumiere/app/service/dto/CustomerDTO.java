@@ -25,7 +25,6 @@ public class CustomerDTO implements Serializable {
 
     private CustomerTier tier;
 
-    @Min(value = 0)
     private Integer loyaltyPoints;
 
     private UserDTO user;

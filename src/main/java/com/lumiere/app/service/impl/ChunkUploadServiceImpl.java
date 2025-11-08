@@ -1,10 +1,13 @@
 package com.lumiere.app.service.impl;
 
+import com.google.cloud.storage.BlobId;
+import com.google.cloud.storage.BlobInfo;
 import com.google.cloud.storage.Storage;
 import com.google.firebase.cloud.StorageClient;
 import com.lumiere.app.service.AttachmentService;
 import com.lumiere.app.service.ChunkUploadService;
 import com.lumiere.app.service.dto.AttachmentDTO;
+import com.lumiere.app.utils.Const;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.stereotype.Service;
 import org.springframework.util.FileSystemUtils;
@@ -13,11 +16,13 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.time.Instant;
+import java.util.concurrent.TimeUnit;
 
 @Service
 public class ChunkUploadServiceImpl implements ChunkUploadService {
@@ -70,12 +75,14 @@ public class ChunkUploadServiceImpl implements ChunkUploadService {
             MultipartFile multipartFile = new MockMultipartFile(
                 fileName, fileName, contentType, is
             );
-            attachmentService.uploadAttachment(multipartFile);
+            attachmentService.uploadAttachment(multipartFile,attachmentDTO);
         }
 
         attachmentDTO.setContentType(contentType);
         attachmentDTO.setSize(size);
         attachmentDTO.setUploadedAt(Instant.now());
+        getImageUrl(attachmentDTO);
+
         FileSystemUtils.deleteRecursively(dir);
 
         AttachmentDTO saved = attachmentService.save(attachmentDTO);
@@ -86,29 +93,19 @@ public class ChunkUploadServiceImpl implements ChunkUploadService {
     }
 
 
-//    private void getImageUrl(AttachmentDTO image, Cache cache) {
-//        String cacheKey = "image_url_" + image.getName();
-//        String cachedUrl = cache != null ? cache.get(cacheKey).toString() : null;
-//
-//        if (cachedUrl != null) {
-//            image.setUrl(cachedUrl);
-//        } else {
-//            try {
-//                BlobId blobId = BlobId.of(Const.BUCKET_NAME, image.getName());
-//                BlobInfo blobInfo = BlobInfo.newBuilder(blobId)
-//                    .setContentType(".jpg")
-//                    .build();
-//                URL url =  storage.signUrl(blobInfo, 30, TimeUnit.MINUTES);
-//                String urlString = url.toString();
-//                image.setUrl(urlString);
-//
-//                if (cache != null) {
-//                    cache.put(cacheKey, urlString);
-//                }
-//            } catch (Exception ignore) {
-//
-//            }
-//        }
-//    }
+    private void getImageUrl(AttachmentDTO image) {
+        try {
+            BlobId blobId = BlobId.of(Const.BUCKET_NAME, image.getName());
+            BlobInfo blobInfo = BlobInfo.newBuilder(blobId)
+                .setContentType(".jpg")
+                .build();
+            URL url =  storage.signUrl(blobInfo, 30, TimeUnit.MINUTES);
+            String urlString = url.toString();
+            image.setUrl(urlString);
+
+        } catch (Exception ignore) {
+
+        }
+    }
 
 }

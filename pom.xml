@@ -112,10 +112,45 @@
       <version>${jhipster-framework.version}</version>
     </dependency>
     <dependency>
+      <groupId>org.projectlombok</groupId>
+      <artifactId>lombok</artifactId>
+      <version>1.18.34</version>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-configuration-processor</artifactId>
       <scope>provided</scope>
     </dependency>
+    <!-- Excel .xlsx (POI + OOXML) -->
+    <dependency>
+      <groupId>org.apache.poi</groupId>
+      <artifactId>poi-ooxml</artifactId>
+      <version>5.2.5</version>
+    </dependency>
+
+    <!-- (Tùy chọn) Đủ full schemas OOXML nếu bạn gặp lỗi missing class khi xử lý nâng cao -->
+    <dependency>
+      <groupId>org.apache.poi</groupId>
+      <artifactId>poi-ooxml-full</artifactId>
+      <version>5.2.5</version>
+      <optional>true</optional>
+    </dependency>
+
+    <!-- (Tùy chọn) Excel .xls cũ, HSSF -->
+    <dependency>
+      <groupId>org.apache.poi</groupId>
+      <artifactId>poi</artifactId>
+      <version>5.2.5</version>
+    </dependency>
+
+    <!-- (Tùy chọn) Tiện đọc/ghi stream, khi tải ảnh… -->
+    <dependency>
+      <groupId>commons-io</groupId>
+      <artifactId>commons-io</artifactId>
+      <version>2.16.1</version>
+    </dependency>
+
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-loader-tools</artifactId>
@@ -567,6 +602,11 @@
               <path>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-configuration-processor</artifactId>
+              </path>
+              <path>
+                <groupId>org.projectlombok</groupId>
+                <artifactId>lombok</artifactId>
+                <version>1.18.34</version>
               </path>
               <path>
                 <groupId>org.mapstruct</groupId>

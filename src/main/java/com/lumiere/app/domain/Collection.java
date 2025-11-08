@@ -27,11 +27,11 @@ public class Collection implements Serializable {
     private Long id;
 
     @NotNull
-    @Column(name = "name", nullable = false, unique = true)
+    @Column(name = "name")
     private String name;
 
     @NotNull
-    @Column(name = "slug", nullable = false, unique = true)
+    @Column(name = "slug")
     private String slug;
 
     @Lob
@@ -39,6 +39,7 @@ public class Collection implements Serializable {
     private String description;
 
     @Column(name = "image_url")
+    @Size(max = 2000)
     private String imageUrl;
 
     @Column(name = "look_image_url")

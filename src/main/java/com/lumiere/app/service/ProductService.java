@@ -1,6 +1,8 @@
 package com.lumiere.app.service;
 
 import com.lumiere.app.service.dto.ProductDTO;
+import org.springframework.transaction.annotation.Transactional;
+
 import java.util.Optional;
 
 /**
@@ -22,6 +24,9 @@ public interface ProductService {
      * @return the persisted entity.
      */
     ProductDTO update(ProductDTO productDTO);
+
+    @Transactional
+    ProductDTO createProductDTO(ProductDTO dto);
 
     /**
      * Partially updates a product.

@@ -1,6 +1,8 @@
 package com.lumiere.app.service;
 
 import com.lumiere.app.service.dto.InventoryDTO;
+
+import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -55,4 +57,6 @@ public interface InventoryService {
      * @param id the id of the entity.
      */
     void delete(Long id);
+
+    List<InventoryDTO> getInventoryByProductId(Long productId);
 }

@@ -202,4 +202,16 @@ public class InventoryResource {
             .headers(HeaderUtil.createEntityDeletionAlert(applicationName, true, ENTITY_NAME, id.toString()))
             .build();
     }
+
+
+    /**
+     * GET /api/inventories/by-product/{productId}
+     * Trả về danh sách InventoryDTO theo productId (không gộp kho).
+     */
+    @GetMapping("/by-product/{productId}")
+    public ResponseEntity<List<InventoryDTO>> getByProductId(@PathVariable @NotNull Long productId) {
+        List<InventoryDTO> list = inventoryService.getInventoryByProductId(productId);
+        return ResponseEntity.ok(list);
+    }
+
 }

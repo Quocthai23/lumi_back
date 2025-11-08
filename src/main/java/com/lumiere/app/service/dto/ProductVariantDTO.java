@@ -2,6 +2,8 @@ package com.lumiere.app.service.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.*;
+import lombok.*;
+
 import java.io.Serializable;
 import java.math.BigDecimal;
 import java.util.Objects;
@@ -11,33 +13,28 @@ import java.util.Objects;
  */
 @Schema(description = "Biến thể của sản phẩm (ví dụ: size, màu sắc).\nFrontend: src/types/product.ts\n@filter")
 @SuppressWarnings("common-java:DuplicatedBlocks")
+@Getter
+@Setter
+@AllArgsConstructor
+@NoArgsConstructor
+@Builder
 public class ProductVariantDTO implements Serializable {
 
     private Long id;
 
-    @NotNull
-    @Size(min = 3, max = 64)
+
     private String sku;
 
-    @NotNull
-    @Size(min = 2, max = 255)
     private String name;
 
-    @NotNull
-    @DecimalMin(value = "0")
     private BigDecimal price;
 
-    @DecimalMin(value = "0")
     private BigDecimal compareAtPrice;
 
-    @Size(max = 3)
     private String currency;
 
-    @NotNull
-    @Min(value = 0L)
     private Long stockQuantity;
 
-    @NotNull
     private Boolean isDefault;
 
     private String color;
@@ -45,6 +42,8 @@ public class ProductVariantDTO implements Serializable {
     private String size;
 
     private ProductDTO product;
+
+    private String urlImage;
 
     public Long getId() {
         return id;

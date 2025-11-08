@@ -1,6 +1,8 @@
 package com.lumiere.app.repository;
 
 import com.lumiere.app.domain.ProductVariant;
+
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
@@ -35,6 +37,12 @@ public interface ProductVariantRepository extends JpaRepository<ProductVariant, 
     @Query("select productVariant from ProductVariant productVariant left join fetch productVariant.product")
     List<ProductVariant> findAllWithToOneRelationships();
 
+    List<ProductVariant> findByProduct_Id(Long productId);
+
     @Query("select productVariant from ProductVariant productVariant left join fetch productVariant.product where productVariant.id =:id")
     Optional<ProductVariant> findOneWithToOneRelationships(@Param("id") Long id);
+
+    List<ProductVariant> findAllByProduct_Id(Long productId);
+    void deleteByIdIn(Collection<Long> ids);
+
 }

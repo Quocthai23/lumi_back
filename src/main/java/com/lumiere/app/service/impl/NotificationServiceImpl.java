@@ -11,8 +11,7 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -88,4 +87,27 @@ public class NotificationServiceImpl implements NotificationService {
         LOG.debug("Request to delete Notification : {}", id);
         notificationRepository.deleteById(id);
     }
-}
+
+    /** Page-based (chuẩn JHipster) */
+    @Override
+    public Page<NotificationDTO> getAdminNotifications(Pageable pageable) {
+        // Gợi ý sort mặc định: createdDate desc nếu client không truyền
+        Pageable p = pageable.getSort().isSorted()
+            ? pageable
+            : PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), Sort.by(Sort.Direction.DESC, "createdAt"));
+
+        return notificationRepository.findAllByCustomerIdIsNull(p)
+            .map(notificationMapper::toDto);
+    }
+
+    /** Infinite scroll (keyset) */
+    @Override
+    public Slice<NotificationDTO> scrollAdminNotifications(Long lastId, int size) {
+        PageRequest pr = PageRequest.of(0, size, Sort.by(Sort.Direction.DESC, "id"));
+
+        Slice<Notification> slice = (lastId == null)
+            ? notificationRepository.findAllByCustomerIdIsNullOrderByIdDesc(pr)
+            : notificationRepository.findAllByCustomerIdIsNullAndIdLessThanOrderByIdDesc(lastId, pr);
+
+        return slice.map(notificationMapper::toDto);
+    }}

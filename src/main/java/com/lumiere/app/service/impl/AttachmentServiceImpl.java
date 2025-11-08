@@ -1,6 +1,5 @@
 package com.lumiere.app.service.impl;
 
-import com.google.cloud.storage.Blob;
 import com.google.cloud.storage.BlobId;
 import com.google.cloud.storage.BlobInfo;
 import com.google.cloud.storage.Storage;
@@ -86,6 +85,11 @@ public class AttachmentServiceImpl implements AttachmentService {
     }
 
     @Override
+    public List<AttachmentDTO> findAllByIdIn(List<Long> ids){
+        return attachmentRepository.findAllByIds(ids).stream().map(attachmentMapper::toDto).collect(Collectors.toCollection(LinkedList::new));
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public Optional<AttachmentDTO> findOne(Long id) {
         LOG.debug("Request to get Attachment : {}", id);
@@ -99,12 +103,13 @@ public class AttachmentServiceImpl implements AttachmentService {
     }
 
     @Override
-    public Blob uploadAttachment(MultipartFile file) throws IOException {
+    public void uploadAttachment(MultipartFile file, AttachmentDTO attachmentDTO) throws IOException {
         String fileName = UUID.randomUUID()+".jpg";
         BlobId blobId = BlobId.of(BUCKET_NAME, fileName);
         BlobInfo blobInfo = BlobInfo.newBuilder(blobId)
             .setContentType(file.getContentType())
             .build();
-        return storage.create(blobInfo, file.getBytes());
+        storage.create(blobInfo, file.getBytes());
+        attachmentDTO.setName(fileName);
     }
 }

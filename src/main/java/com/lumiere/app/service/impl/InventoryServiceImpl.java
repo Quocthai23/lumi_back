@@ -3,9 +3,15 @@ package com.lumiere.app.service.impl;
 import com.lumiere.app.domain.Inventory;
 import com.lumiere.app.repository.InventoryRepository;
 import com.lumiere.app.service.InventoryService;
+import com.lumiere.app.service.ProductVariantService;
 import com.lumiere.app.service.dto.InventoryDTO;
+import com.lumiere.app.service.dto.ProductVariantDTO;
 import com.lumiere.app.service.mapper.InventoryMapper;
+
+import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
@@ -25,10 +31,12 @@ public class InventoryServiceImpl implements InventoryService {
     private final InventoryRepository inventoryRepository;
 
     private final InventoryMapper inventoryMapper;
+    private final ProductVariantService productVariantService;
 
-    public InventoryServiceImpl(InventoryRepository inventoryRepository, InventoryMapper inventoryMapper) {
+    public InventoryServiceImpl(InventoryRepository inventoryRepository, InventoryMapper inventoryMapper, ProductVariantService productVariantService) {
         this.inventoryRepository = inventoryRepository;
         this.inventoryMapper = inventoryMapper;
+        this.productVariantService = productVariantService;
     }
 
     @Override
@@ -77,5 +85,17 @@ public class InventoryServiceImpl implements InventoryService {
     public void delete(Long id) {
         LOG.debug("Request to delete Inventory : {}", id);
         inventoryRepository.deleteById(id);
+    }
+
+    @Override
+    public List<InventoryDTO> getInventoryByProductId(Long productId){
+        List<Long> variantDTOS = productVariantService
+            .findByProductId(productId).stream().map(ProductVariantDTO::getId).toList();
+
+        List<Inventory> inventories = inventoryRepository.findAllByProductVariant_IdIn(variantDTOS);
+
+        List<InventoryDTO> inventoryDTOS = inventoryMapper.toDto(inventories);
+
+        return inventoryDTOS;
     }
 }

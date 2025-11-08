@@ -98,7 +98,7 @@ public class ProductVariantResource {
             throw new BadRequestAlertException("Entity not found", ENTITY_NAME, "idnotfound");
         }
 
-        productVariantDTO = productVariantService.update(productVariantDTO);
+        productVariantDTO = productVariantService.partialUpdate(productVariantDTO).get();
         return ResponseEntity.ok()
             .headers(HeaderUtil.createEntityUpdateAlert(applicationName, true, ENTITY_NAME, productVariantDTO.getId().toString()))
             .body(productVariantDTO);
@@ -192,5 +192,14 @@ public class ProductVariantResource {
         return ResponseEntity.noContent()
             .headers(HeaderUtil.createEntityDeletionAlert(applicationName, true, ENTITY_NAME, id.toString()))
             .build();
+    }
+
+    @PutMapping("/{productId}/default/{variantId}")
+    public ResponseEntity<Void> setDefaultVariant(
+        @PathVariable @NotNull Long productId,
+        @PathVariable @NotNull Long variantId
+    ) {
+        productVariantService.setIsDefault(variantId, productId);
+        return ResponseEntity.noContent().build();
     }
 }
