@@ -93,6 +93,13 @@ management:
 spring:
   application:
     name: lumiere
+  media:
+    root: uploads   # Linux/Mac. Trên Windows có thể đặt: D:/app/media
+  spring:
+    servlet:
+      multipart:
+        max-file-size: 20MB
+        max-request-size: 20MB
   docker:
     compose:
       enabled: false
@@ -228,4 +235,6 @@ jhipster:
 # https://www.jhipster.tech/common-application-properties/
 # ===================================================================
 
-# application:
+# application
+app:
+  public-base-url: http://localhost:8080   # ví dụ: https://shop.example.com

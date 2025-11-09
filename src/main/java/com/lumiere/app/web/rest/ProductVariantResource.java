@@ -202,4 +202,14 @@ public class ProductVariantResource {
         productVariantService.setIsDefault(variantId, productId);
         return ResponseEntity.noContent().build();
     }
+
+    @GetMapping("/by-product-ids")
+    public ResponseEntity<List<ProductVariantDTO>> setDefaultVariantByProductIds(
+        @RequestParam @NotNull List<Long> productIds
+    ) {
+        List<ProductVariantDTO> rs = productIds.stream().map(id -> {
+            return productVariantService.findByProductId(id).stream().filter(ProductVariantDTO::getIsDefault).findFirst().orElse(null);
+        }).toList();
+        return ResponseEntity.ok().body(rs);
+    }
 }

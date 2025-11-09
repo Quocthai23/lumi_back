@@ -10,6 +10,7 @@ import com.lumiere.app.repository.AttachmentRepository;
 import com.lumiere.app.service.AttachmentService;
 import com.lumiere.app.service.dto.AttachmentDTO;
 import com.lumiere.app.service.mapper.AttachmentMapper;
+import com.lumiere.app.utils.PublicUrlBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -17,10 +18,10 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.util.*;
 import java.util.stream.Collectors;
 
 
@@ -31,19 +32,17 @@ public class AttachmentServiceImpl implements AttachmentService {
     private static final Logger LOG = LoggerFactory.getLogger(AttachmentServiceImpl.class);
 
     private final AttachmentRepository attachmentRepository;
+    private final Path mediaRoot;
 
     private final AttachmentMapper attachmentMapper;
-    private static final String BUCKET_NAME = "demofirebase-6e7a1.appspot.com";
-    private final Storage storage;
+    private final PublicUrlBuilder urlBuilder;
 
-    public AttachmentServiceImpl(AttachmentRepository attachmentRepository, AttachmentMapper attachmentMapper) {
+
+    public AttachmentServiceImpl(AttachmentRepository attachmentRepository, Path mediaRoot, AttachmentMapper attachmentMapper, PublicUrlBuilder urlBuilder) {
         this.attachmentRepository = attachmentRepository;
+        this.mediaRoot = mediaRoot;
         this.attachmentMapper = attachmentMapper;
-        if(StorageClient.getInstance() != null){
-            this.storage = StorageClient.getInstance().bucket().getStorage();
-        }else{
-            this.storage = null;
-        }
+        this.urlBuilder = urlBuilder;
     }
 
     @Override
@@ -98,18 +97,16 @@ public class AttachmentServiceImpl implements AttachmentService {
 
     @Override
     public void delete(Long id) {
-        LOG.debug("Request to delete Attachment : {}", id);
-        attachmentRepository.deleteById(id);
+        attachmentRepository.findById(id).ifPresent(att -> {
+            String name = att.getName();
+            if (name != null && name.matches("^[a-fA-F0-9\\-]{8,}\\.\\w{1,10}$")) {
+                try {
+                    Files.deleteIfExists(mediaRoot.resolve("attachments").resolve(name).normalize());
+                } catch (Exception ignored) {}
+            }
+            attachmentRepository.delete(att);
+        });
     }
 
-    @Override
-    public void uploadAttachment(MultipartFile file, AttachmentDTO attachmentDTO) throws IOException {
-        String fileName = UUID.randomUUID()+".jpg";
-        BlobId blobId = BlobId.of(BUCKET_NAME, fileName);
-        BlobInfo blobInfo = BlobInfo.newBuilder(blobId)
-            .setContentType(file.getContentType())
-            .build();
-        storage.create(blobInfo, file.getBytes());
-        attachmentDTO.setName(fileName);
-    }
+
 }

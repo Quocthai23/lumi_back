@@ -58,6 +58,4 @@ public interface AttachmentService {
      * @param id the id of the entity.
      */
     void delete(Long id);
-
-    void uploadAttachment(MultipartFile file, AttachmentDTO attachmentDTO) throws IOException;
 }
