@@ -9,4 +9,5 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface CartItemRepository extends JpaRepository<CartItem, Long>, JpaSpecificationExecutor<CartItem> {
     Page<CartItem> findAllByCustomerId(Long customerId, Pageable pageable);
+    CartItem findCartItemByCustomerIdAndVariantId(Long customerId, Long variantId);
 }

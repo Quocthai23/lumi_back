@@ -1,5 +1,6 @@
 package com.lumiere.app.repository;
 
+import com.lumiere.app.domain.OptionVariant;
 import com.lumiere.app.domain.ProductVariant;
 
 import java.util.Collection;
@@ -44,5 +45,4 @@ public interface ProductVariantRepository extends JpaRepository<ProductVariant, 
 
     List<ProductVariant> findAllByProduct_Id(Long productId);
     void deleteByIdIn(Collection<Long> ids);
-
 }

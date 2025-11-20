@@ -5,6 +5,7 @@ import com.lumiere.app.repository.CartItemRepository;
 import com.lumiere.app.service.CartItemService;
 import com.lumiere.app.service.dto.CartItemDTO;
 import com.lumiere.app.service.mapper.CartItemMapper;
+import com.lumiere.app.utils.MergeUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
@@ -137,5 +138,32 @@ public class CartItemServiceImpl implements CartItemService {
     public Page<CartItemDTO> findAllByCustomerId(Long customerId, Pageable pageable) {
         log.debug("Request to get CartItems by customerId : {}", customerId);
         return cartItemRepository.findAllByCustomerId(customerId, pageable).map(cartItemMapper::toDto);
+    }
+
+    @Override
+    public CartItemDTO findByCustomerIdAndVariantId(Long customerId, Long variantId){
+        return cartItemMapper.toDto(cartItemRepository.findCartItemByCustomerIdAndVariantId(customerId,variantId));
+    }
+
+    @Override
+    public CartItemDTO createCartItem(CartItemDTO cartItemDTO, Long userId){
+
+        CartItemDTO exist = this.findByCustomerIdAndVariantId(cartItemDTO.getVariantId(), userId);
+
+        if(exist != null){
+
+            MergeUtils.Options opts = new MergeUtils.Options()
+                .overwriteNulls(false)
+                .replaceCollections(false);
+            MergeUtils.merge(exist,cartItemDTO,opts);
+
+            exist = this.save(exist);
+        }else{
+            cartItemDTO.setCustomerId(userId);
+            cartItemDTO.setCreatedDate(Instant.now());
+            cartItemDTO.setLastModifiedDate(Instant.now());
+            exist = this.save(cartItemDTO);
+        }
+        return exist;
     }
 }

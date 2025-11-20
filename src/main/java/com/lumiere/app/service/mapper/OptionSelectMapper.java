@@ -9,9 +9,10 @@ import org.mapstruct.*;
 @Mapper(componentModel = "spring")
 public interface OptionSelectMapper {
   @Mapping(target = "optionGroupId", source = "optionGroup.id")
+  @Mapping(target = "optionGroupName", source = "optionGroup.name")
   OptionSelectDTO toDto(OptionSelect e);
 
-  @Mapping(target = "optionGroup", source = "optionGroupId", qualifiedByName = "groupFromId")
+  @Mapping(target = "optionGroup", ignore = true)
   OptionSelect toEntity(OptionSelectDTO dto);
 
   @Named("groupFromId")

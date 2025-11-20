@@ -23,4 +23,8 @@ public interface CartItemService {
 
     @Transactional(readOnly = true)
     Page<CartItemDTO> findAllByCustomerId(Long customerId, Pageable pageable);
+
+    CartItemDTO findByCustomerIdAndVariantId(Long customerId, Long variantId);
+
+    CartItemDTO createCartItem(CartItemDTO cartItemDTO, Long userId);
 }

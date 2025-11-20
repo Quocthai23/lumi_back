@@ -1,6 +1,7 @@
 package com.lumiere.app.web.rest;
 
 import com.lumiere.app.repository.CartItemRepository;
+import com.lumiere.app.security.SecurityUtils;
 import com.lumiere.app.service.CartItemService;
 import com.lumiere.app.service.dto.CartItemDTO;
 import com.lumiere.app.web.rest.errors.BadRequestAlertException;
@@ -17,10 +18,9 @@ import tech.jhipster.web.util.HeaderUtil;
 import tech.jhipster.web.util.PaginationUtil;
 import tech.jhipster.web.util.ResponseUtil;
 
-import javax.validation.Valid;
-import javax.validation.constraints.NotNull;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.security.Principal;
 import java.util.List;
 import java.util.Optional;
 
@@ -48,12 +48,15 @@ public class CartItemResource {
      * {@code POST  /cart-items} : Create a new cartItem.
      */
     @PostMapping("/cart-items")
-    public ResponseEntity<CartItemDTO> createCartItem(@Valid @RequestBody CartItemDTO cartItemDTO) throws URISyntaxException {
+    public ResponseEntity<CartItemDTO> createCartItem(
+        @RequestBody CartItemDTO cartItemDTO
+    ) throws URISyntaxException {
         log.debug("REST request to save CartItem : {}", cartItemDTO);
         if (cartItemDTO.getId() != null) {
             throw new BadRequestAlertException("A new cartItem cannot already have an ID", ENTITY_NAME, "idexists");
         }
-        CartItemDTO result = cartItemService.save(cartItemDTO);
+        Long userId = SecurityUtils.getCurrentUserId().get();
+        CartItemDTO result = cartItemService.createCartItem(cartItemDTO,userId);
         return ResponseEntity
             .created(new URI("/api/cart-items/" + result.getId()))
             .headers(HeaderUtil.createEntityCreationAlert(applicationName, false, ENTITY_NAME, result.getId().toString()))
@@ -66,7 +69,7 @@ public class CartItemResource {
     @PutMapping("/cart-items/{id}")
     public ResponseEntity<CartItemDTO> updateCartItem(
         @PathVariable(value = "id", required = false) final Long id,
-        @Valid @RequestBody CartItemDTO cartItemDTO
+        @RequestBody CartItemDTO cartItemDTO
     ) {
         log.debug("REST request to update CartItem : {}, {}", id, cartItemDTO);
         if (cartItemDTO.getId() == null) {
@@ -93,7 +96,7 @@ public class CartItemResource {
     @PatchMapping(value = "/cart-items/{id}", consumes = { "application/json", "application/merge-patch+json" })
     public ResponseEntity<CartItemDTO> partialUpdateCartItem(
         @PathVariable(value = "id", required = false) final Long id,
-        @NotNull @RequestBody CartItemDTO cartItemDTO
+        @RequestBody CartItemDTO cartItemDTO
     ) {
         log.debug("REST request to partial update CartItem partially : {}, {}", id, cartItemDTO);
         if (cartItemDTO.getId() == null) {

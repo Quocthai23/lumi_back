@@ -5,6 +5,9 @@ import com.lumiere.app.domain.enumeration.ProductStatus;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.persistence.Lob;
 import jakarta.validation.constraints.*;
+import lombok.Getter;
+import lombok.Setter;
+
 import java.io.Serializable;
 import java.time.Instant;
 import java.util.HashSet;
@@ -16,6 +19,8 @@ import java.util.Set;
  */
 @Schema(description = "Thực thể Product, đại diện cho một mặt hàng.\nFrontend: src/types/product.ts\n@filter")
 @SuppressWarnings("common-java:DuplicatedBlocks")
+@Getter
+@Setter
 public class ProductDTO implements Serializable {
 
     private Long id;
@@ -49,150 +54,15 @@ public class ProductDTO implements Serializable {
 
     private Instant updatedAt;
 
-
-    private Set<AttachmentDTO> attachmentDTOS;
-
-    public Set<AttachmentDTO> getAttachmentDTOS() {
-        return attachmentDTOS;
-    }
-
-    public void setAttachmentDTOS(Set<AttachmentDTO> attachmentDTOS) {
-        this.attachmentDTOS = attachmentDTOS;
-    }
+    private Long categoryId;
 
     private Set<ProductAttachment> productAttachments = new HashSet<>();
 
-    public Set<ProductAttachment> getProductAttachments() {
-        return productAttachments;
-    }
-
-    public void setProductAttachments(Set<ProductAttachment> productAttachments) {
-        this.productAttachments = productAttachments;
-    }
+    private Set<AttachmentDTO> attachmentDTOS;
 
     private Set<CollectionDTO> collections = new HashSet<>();
 
     private Set<CustomerDTO> wishlistedBies = new HashSet<>();
-
-    public Long getId() {
-        return id;
-    }
-
-    public void setId(Long id) {
-        this.id = id;
-    }
-
-    public String getCode() {
-        return code;
-    }
-
-    public void setCode(String code) {
-        this.code = code;
-    }
-
-    public String getName() {
-        return name;
-    }
-
-    public void setName(String name) {
-        this.name = name;
-    }
-
-    public String getSlug() {
-        return slug;
-    }
-
-    public void setSlug(String slug) {
-        this.slug = slug;
-    }
-
-    public String getDescription() {
-        return description;
-    }
-
-    public void setDescription(String description) {
-        this.description = description;
-    }
-
-    public ProductStatus getStatus() {
-        return status;
-    }
-
-    public void setStatus(ProductStatus status) {
-        this.status = status;
-    }
-
-    public String getCategory() {
-        return category;
-    }
-
-    public void setCategory(String category) {
-        this.category = category;
-    }
-
-    public String getMaterial() {
-        return material;
-    }
-
-    public void setMaterial(String material) {
-        this.material = material;
-    }
-
-    public Double getAverageRating() {
-        return averageRating;
-    }
-
-    public void setAverageRating(Double averageRating) {
-        this.averageRating = averageRating;
-    }
-
-    public Integer getReviewCount() {
-        return reviewCount;
-    }
-
-    public void setReviewCount(Integer reviewCount) {
-        this.reviewCount = reviewCount;
-    }
-
-    public String getImages() {
-        return images;
-    }
-
-    public void setImages(String images) {
-        this.images = images;
-    }
-
-    public Instant getCreatedAt() {
-        return createdAt;
-    }
-
-    public void setCreatedAt(Instant createdAt) {
-        this.createdAt = createdAt;
-    }
-
-    public Instant getUpdatedAt() {
-        return updatedAt;
-    }
-
-    public void setUpdatedAt(Instant updatedAt) {
-        this.updatedAt = updatedAt;
-    }
-
-    public Set<CollectionDTO> getCollections() {
-        return collections;
-    }
-
-    public void setCollections(Set<CollectionDTO> collections) {
-        this.collections = collections;
-    }
-
-    public Set<CustomerDTO> getWishlistedBies() {
-        return wishlistedBies;
-    }
-
-    public void setWishlistedBies(Set<CustomerDTO> wishlistedBies) {
-        this.wishlistedBies = wishlistedBies;
-    }
 
     @Override
     public boolean equals(Object o) {

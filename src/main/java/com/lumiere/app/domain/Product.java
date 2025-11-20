@@ -8,6 +8,9 @@ import java.io.Serializable;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.Set;
+
+import lombok.Getter;
+import lombok.Setter;
 import org.hibernate.annotations.Cache;
 import org.hibernate.annotations.CacheConcurrencyStrategy;
 
@@ -19,6 +22,8 @@ import org.hibernate.annotations.CacheConcurrencyStrategy;
 @Entity
 @Table(name = "product")
 @Cache(usage = CacheConcurrencyStrategy.READ_WRITE)
+@Getter
+@Setter
 @SuppressWarnings("common-java:DuplicatedBlocks")
 public class Product implements Serializable {
 
@@ -98,6 +103,17 @@ public class Product implements Serializable {
     @Cache(usage = CacheConcurrencyStrategy.READ_WRITE)
     @JsonIgnoreProperties(value = { "user", "orders", "wishlists", "addresses", "loyaltyHistories", "notifications" }, allowSetters = true)
     private Set<Customer> wishlistedBies = new HashSet<>();
+
+    @Setter
+    @Getter
+    @Column(name = "category_id")
+    private Long categoryId;
+
+    // Product.java
+    @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @Cache(usage = CacheConcurrencyStrategy.READ_WRITE)
+    @JsonIgnoreProperties(value = { "product" }, allowSetters = true)
+    private Set<ProductAttachment> productAttachments = new HashSet<>();
 
     // jhipster-needle-entity-add-field - JHipster will add fields here
 

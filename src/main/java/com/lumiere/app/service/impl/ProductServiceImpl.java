@@ -14,6 +14,7 @@ import com.lumiere.app.service.dto.ProductDTO;
 import com.lumiere.app.service.mapper.AttachmentMapper;
 import com.lumiere.app.service.mapper.ProductMapper;
 
+import java.math.BigDecimal;
 import java.security.SecureRandom;
 import java.time.Instant;
 import java.util.*;
@@ -23,6 +24,9 @@ import com.lumiere.app.utils.CodeUtils;
 import com.lumiere.app.utils.SlugUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -229,8 +233,12 @@ public class ProductServiceImpl implements ProductService {
         Optional<ProductDTO> productDTO = productRepository.findById(id).map(productMapper::toDto);
         if(productDTO.isPresent()){
             List<ProductAttachment> productAttachments = productAttachmentRepository.findAllByProductId(id);
-            List<AttachmentDTO> attachmentDTOS = attachmentService.findAllByIdIn(productAttachments.stream().map(productAttachment -> productAttachment.getId().getAttachmentId()).toList());
-            productDTO.get().setAttachmentDTOS(new HashSet<>(attachmentDTOS));
+            if(!productAttachments.isEmpty()){
+                List<AttachmentDTO> attachmentDTOS = attachmentService.findAllByIdIn(productAttachments.stream().map(productAttachment -> productAttachment.getId().getAttachmentId()).toList());
+                productDTO.get().setAttachmentDTOS(new HashSet<>(attachmentDTOS));
+                productDTO.get().setProductAttachments(null);
+            }
+
         }
         return productDTO;
     }
@@ -239,5 +247,46 @@ public class ProductServiceImpl implements ProductService {
     public void delete(Long id) {
         LOG.debug("Request to delete Product : {}", id);
         productRepository.deleteById(id);
+    }
+
+    @Override
+    public Page<ProductDTO> searchProducts(
+        List<Long> categoryIds,
+        BigDecimal minPrice,
+        BigDecimal maxPrice,
+        Pageable pageable
+    ) {
+        if (categoryIds != null && categoryIds.isEmpty()) {
+            categoryIds = null;
+        }
+
+        // Bước 1: page theo id
+        Page<Long> idPage = productRepository.searchProductIdsByCategoryAndCheapestVariantPrice(
+            categoryIds,
+            minPrice,
+            maxPrice,
+            pageable
+        );
+
+        List<Long> ids = idPage.getContent();
+        if (ids.isEmpty()) {
+            return Page.empty(pageable);
+        }
+
+        // Bước 2: fetch product + attachments
+        List<Product> products = productRepository.findWithAttachmentsByIdIn(ids);
+
+        // Sắp xếp về đúng thứ tự theo ids (vì IN không đảm bảo thứ tự)
+        Map<Long, Integer> orderMap = new HashMap<>();
+        for (int i = 0; i < ids.size(); i++) {
+            orderMap.put(ids.get(i), i);
+        }
+        products.sort(Comparator.comparing(p -> orderMap.getOrDefault(p.getId(), Integer.MAX_VALUE)));
+
+        List<ProductDTO> dtos = products.stream()
+            .map(productMapper::toDto)
+            .toList();
+
+        return new PageImpl<>(dtos, pageable, idPage.getTotalElements());
     }
 }

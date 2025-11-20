@@ -8,8 +8,11 @@ import com.lumiere.app.service.dto.ProductDTO;
 import com.lumiere.app.web.rest.errors.BadRequestAlertException;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
+
+import java.math.BigDecimal;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -197,5 +200,37 @@ public class ProductResource {
         return ResponseEntity.noContent()
             .headers(HeaderUtil.createEntityDeletionAlert(applicationName, true, ENTITY_NAME, id.toString()))
             .build();
+    }
+
+    @GetMapping("/search")
+    public ResponseEntity<Page<ProductDTO>> getAllProducts(
+        @RequestParam(value = "categoryId.in", required = false) String categoryIdsRaw,
+        @RequestParam(value = "price.greaterThanOrEqual", required = false) String minPriceStr,
+        @RequestParam(value = "price.lessThanOrEqual", required = false) String maxPriceStr,
+        Pageable pageable
+    ) {
+        List<Long> categoryIds = null;
+        if (categoryIdsRaw != null && !categoryIdsRaw.isBlank()) {
+            categoryIds = Arrays.stream(categoryIdsRaw.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .map(Long::valueOf)
+                .toList();
+        }
+
+        BigDecimal minPrice = null;
+        BigDecimal maxPrice = null;
+
+        if (minPriceStr != null && !minPriceStr.isBlank()) {
+            minPrice = new BigDecimal(minPriceStr);
+        }
+        if (maxPriceStr != null && !maxPriceStr.isBlank()) {
+            maxPrice = new BigDecimal(maxPriceStr);
+        }
+
+        Page<ProductDTO> page = productService.searchProducts(categoryIds, minPrice, maxPrice, pageable);
+
+        return ResponseEntity.ok()
+            .body(page);
     }
 }

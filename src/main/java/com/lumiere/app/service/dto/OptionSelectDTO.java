@@ -11,4 +11,5 @@ public class OptionSelectDTO {
   private String code;
   private Integer position;
   private Boolean active;
+  private String optionGroupName;  // nếu cần show tên
 }

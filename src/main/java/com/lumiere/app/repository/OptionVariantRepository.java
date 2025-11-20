@@ -14,4 +14,7 @@ public interface OptionVariantRepository extends JpaRepository<OptionVariant, Lo
     boolean existsByProductVariant_IdAndOptionSelect_Id(Long variantId, Long selectId);
     List<OptionVariant> findByProductVariant_Product_Id(Long productId);
     List<OptionVariant> findByProductVariant_IdIn(Collection<Long> variantIds);
+    List<OptionVariant> findByOptionSelect_IdIn(Collection<Long> selectIds);
+
+    List<OptionVariant> findByProductVariant_idIn(Collection<Long> variantIds);
 }

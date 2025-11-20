@@ -38,6 +38,9 @@ public class OptionGroup implements Serializable {
     @Column(name = "position")
     private Integer position;
 
+    @Column(name = "default_type")
+    private String variantDefaultType;
+
     @OneToMany(mappedBy = "optionGroup", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("position ASC, id ASC")
     private Set<OptionSelect> selects = new LinkedHashSet<>();

@@ -4,6 +4,7 @@ package com.lumiere.app.web.rest;
 import com.lumiere.app.service.OptionVariantService;
 import com.lumiere.app.service.dto.GroupSelectReq;
 import com.lumiere.app.service.dto.OptionVariantDTO;
+import com.lumiere.app.service.dto.ProductVariantDTO;
 import com.lumiere.app.service.dto.SyncMixResult;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
@@ -54,6 +55,21 @@ public class OptionVariantResource {
     ){
         SyncMixResult res = service.syncVariantMixes(productId, groups);
         return ResponseEntity.ok(res);
+    }
+
+    @PostMapping("/find-by-selects")
+    public ResponseEntity<ProductVariantDTO> findBySelects(@RequestBody List<Long> selectOptionIds) {
+        if (selectOptionIds == null || selectOptionIds.isEmpty()) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        ProductVariantDTO dto = service.findVariantBySelectOptionIds(selectOptionIds);
+
+        if (dto == null) {
+            return ResponseEntity.notFound().build();
+        }
+
+        return ResponseEntity.ok(dto);
     }
 
 }

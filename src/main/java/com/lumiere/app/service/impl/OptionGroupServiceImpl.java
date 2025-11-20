@@ -5,7 +5,9 @@ import com.lumiere.app.domain.OptionGroup;
 import com.lumiere.app.repository.OptionGroupRepository;
 import com.lumiere.app.service.OptionGroupService;
 import com.lumiere.app.service.dto.OptionGroupDTO;
+import com.lumiere.app.service.dto.OptionSelectDTO;
 import com.lumiere.app.service.mapper.OptionGroupMapper;
+import com.lumiere.app.service.mapper.OptionSelectMapper;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -20,8 +22,9 @@ public class OptionGroupServiceImpl implements OptionGroupService {
 
   private final OptionGroupRepository repo;
   private final OptionGroupMapper mapper;
+    private final OptionSelectMapper optionSelectMapper;
 
-  @Override
+    @Override
   public OptionGroupDTO create(OptionGroupDTO dto){
     if (repo.existsByProduct_IdAndCodeIgnoreCase(dto.getProductId(), dto.getCode()))
       throw new IllegalArgumentException("OptionGroup code duplicated in product");
@@ -45,7 +48,13 @@ public class OptionGroupServiceImpl implements OptionGroupService {
   @Override
   @Transactional(readOnly = true)
   public List<OptionGroupDTO> findByProduct(Long productId){
-    return repo.findByProduct_IdOrderByPositionAscIdAsc(productId).stream().map(mapper::toDto).toList();
+    return repo.findByProduct_IdOrderByPositionAscIdAsc(productId).stream().map(entity->{
+        List<OptionSelectDTO> optionSelectDTOS = entity.getSelects().stream().map(optionSelectMapper::toDto).toList();
+        OptionGroupDTO dto = mapper.toDto(entity);
+        dto.setOptionSelectDTOS(optionSelectDTOS);
+        dto.setSelects(null);
+        return dto;
+    }).toList();
   }
 
   @Override

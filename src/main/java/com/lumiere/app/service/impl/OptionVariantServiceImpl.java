@@ -11,16 +11,16 @@ import com.lumiere.app.repository.ProductVariantRepository;
 import com.lumiere.app.service.OptionVariantService;
 import com.lumiere.app.service.dto.GroupSelectReq;
 import com.lumiere.app.service.dto.OptionVariantDTO;
+import com.lumiere.app.service.dto.ProductVariantDTO;
 import com.lumiere.app.service.dto.SyncMixResult;
 import com.lumiere.app.service.mapper.OptionVariantMapper;
+import com.lumiere.app.service.mapper.ProductVariantMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -32,7 +32,9 @@ public class OptionVariantServiceImpl implements OptionVariantService {
     private final ProductVariantRepository productVariantRepository;
     private final ProductRepository productRepository;
     private final OptionSelectRepository optionSelectRepository;
-  @Override
+    private final ProductVariantMapper productVariantMapper;
+
+    @Override
   public List<OptionVariantDTO> assign(Long variantId, List<Long> optionSelectIds){
     List<OptionVariantDTO> created = new ArrayList<>();
     for (Long sid : optionSelectIds) {
@@ -231,6 +233,72 @@ public class OptionVariantServiceImpl implements OptionVariantService {
         String joined = keyOf(selectIds).replace("-", ".");
         String suffix = String.valueOf(System.currentTimeMillis()).substring(7); // tạm
         return prefix + "-" + joined + "-" + suffix;
+    }
+
+    @Transactional(readOnly = true)
+    @Override
+    public ProductVariantDTO findVariantBySelectOptionIds(List<Long> selectOptions) {
+        if (selectOptions == null || selectOptions.isEmpty()) {
+            return null;
+        }
+
+        // Chuẩn hóa: bỏ trùng
+        Set<Long> targetSet = new HashSet<>(selectOptions);
+
+        // 1) Lấy tất cả OptionVariant có selectId thuộc targetSet
+        List<OptionVariant> candidateMappings =
+            repo.findByOptionSelect_IdIn(targetSet);
+
+        if (candidateMappings.isEmpty()) {
+            return null;
+        }
+
+        // 2) Lấy danh sách variantId ứng viên
+        Set<Long> candidateVariantIds = candidateMappings.stream()
+            .map(ov -> ov.getProductVariant().getId())
+            .collect(Collectors.toSet());
+
+        if (candidateVariantIds.isEmpty()) {
+            return null;
+        }
+
+        // 3) Lấy TẤT CẢ mapping của các variant ứng viên
+        List<OptionVariant> allMappingsForCandidates =
+            repo.findByProductVariant_idIn(candidateVariantIds);
+
+        // 4) Gom thành: variantId -> set<selectId>
+        Map<Long, Set<Long>> variantToSelectIds = allMappingsForCandidates.stream()
+            .collect(Collectors.groupingBy(
+                ov -> ov.getProductVariant().getId(),
+                Collectors.mapping(
+                    ov -> ov.getOptionSelect().getId(),
+                    Collectors.toSet()
+                )
+            ));
+
+        // 5) Tìm variant có selectIds == targetSet (exact match)
+        Long matchedVariantId = variantToSelectIds.entrySet().stream()
+            .filter(e -> {
+                Set<Long> variantSet = e.getValue();
+                return variantSet.size() == targetSet.size()
+                    && variantSet.containsAll(targetSet);
+            })
+            .map(Map.Entry::getKey)
+            .findFirst()
+            .orElse(null);
+
+        if (matchedVariantId == null) {
+            return null;
+        }
+
+        ProductVariant variant = productVariantRepository.findById(matchedVariantId)
+            .orElse(null);
+
+        if (variant == null) {
+            return null;
+        }
+
+        return productVariantMapper.toDto(variant);
     }
 
 }

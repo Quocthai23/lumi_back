@@ -3,6 +3,7 @@ package com.lumiere.app.service;
 
 import com.lumiere.app.service.dto.GroupSelectReq;
 import com.lumiere.app.service.dto.OptionVariantDTO;
+import com.lumiere.app.service.dto.ProductVariantDTO;
 import com.lumiere.app.service.dto.SyncMixResult;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -16,4 +17,7 @@ public interface OptionVariantService {
   List<OptionVariantDTO> replaceAll(Long variantId, List<Long> newSelectIds);
 
     SyncMixResult syncVariantMixes(Long productId, List<GroupSelectReq> groups);
+
+    @Transactional(readOnly = true)
+    ProductVariantDTO findVariantBySelectOptionIds(List<Long> selectOptions);
 }

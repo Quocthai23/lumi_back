@@ -1,8 +1,12 @@
 package com.lumiere.app.service;
 
 import com.lumiere.app.service.dto.ProductDTO;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -50,4 +54,12 @@ public interface ProductService {
      * @param id the id of the entity.
      */
     void delete(Long id);
+
+    Page<ProductDTO> searchProducts(
+        List<Long> categoryIds,
+        BigDecimal minPrice,
+        BigDecimal maxPrice,
+        Pageable pageable
+    );
+
 }
