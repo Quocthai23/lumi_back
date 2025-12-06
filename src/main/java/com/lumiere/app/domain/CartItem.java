@@ -23,11 +23,9 @@ public class CartItem implements Serializable {
     @Column(name = "customer_id", nullable = false)
     private Long customerId;
 
-    // Id sản phẩm
     @Column(name = "product_id", nullable = false)
     private Long productId;
 
-    // Id biến thể (màu/size...) nếu có
     @Column(name = "variant_id")
     private Long variantId;
 
@@ -47,7 +45,6 @@ public class CartItem implements Serializable {
     @Column(name = "last_modified_date")
     private Instant lastModifiedDate;
 
-    // ===== Getter / Setter / fluent API =====
 
     public Long getId() {
         return id;

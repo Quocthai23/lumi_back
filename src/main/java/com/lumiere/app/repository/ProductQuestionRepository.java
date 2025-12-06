@@ -39,4 +39,8 @@ public interface ProductQuestionRepository extends JpaRepository<ProductQuestion
         "select productQuestion from ProductQuestion productQuestion left join fetch productQuestion.product where productQuestion.id =:id"
     )
     Optional<ProductQuestion> findOneWithToOneRelationships(@Param("id") Long id);
+
+    Page<ProductQuestion> findByProductIdAndStatusOrderByCreatedAtDesc(Long productId, com.lumiere.app.domain.enumeration.QuestionStatus status, Pageable pageable);
+
+    Page<ProductQuestion> findByProductIdOrderByCreatedAtDesc(Long productId, Pageable pageable);
 }

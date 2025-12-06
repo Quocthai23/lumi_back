@@ -63,4 +63,13 @@ public interface ProductQuestionService {
      * @param id the id of the entity.
      */
     void delete(Long id);
+
+    /**
+     * Get all productQuestions by product ID.
+     *
+     * @param productId the product ID.
+     * @param pageable the pagination information.
+     * @return the list of entities.
+     */
+    Page<ProductQuestionDTO> findByProductId(Long productId, Pageable pageable);
 }

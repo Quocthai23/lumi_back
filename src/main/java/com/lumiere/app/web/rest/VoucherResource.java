@@ -1,7 +1,11 @@
 package com.lumiere.app.web.rest;
 
+import com.lumiere.app.repository.CustomerRepository;
 import com.lumiere.app.repository.VoucherRepository;
+import com.lumiere.app.security.SecurityUtils;
 import com.lumiere.app.service.VoucherService;
+import com.lumiere.app.service.dto.VoucherCalculateRequestDTO;
+import com.lumiere.app.service.dto.VoucherCalculateResponseDTO;
 import com.lumiere.app.service.dto.VoucherDTO;
 import com.lumiere.app.web.rest.errors.BadRequestAlertException;
 import jakarta.validation.Valid;
@@ -37,9 +41,16 @@ public class VoucherResource {
 
     private final VoucherRepository voucherRepository;
 
-    public VoucherResource(VoucherService voucherService, VoucherRepository voucherRepository) {
+    private final CustomerRepository customerRepository;
+
+    public VoucherResource(
+        VoucherService voucherService,
+        VoucherRepository voucherRepository,
+        CustomerRepository customerRepository
+    ) {
         this.voucherService = voucherService;
         this.voucherRepository = voucherRepository;
+        this.customerRepository = customerRepository;
     }
 
     /**
@@ -167,5 +178,43 @@ public class VoucherResource {
         return ResponseEntity.noContent()
             .headers(HeaderUtil.createEntityDeletionAlert(applicationName, true, ENTITY_NAME, id.toString()))
             .build();
+    }
+
+    /**
+     * {@code POST  /vouchers/calculate} : Tính tiền giảm giá từ voucher code.
+     *
+     * @param request request chứa voucher code và order amount
+     * @return the {@link ResponseEntity} with status {@code 200 (OK)} and with body the VoucherCalculateResponseDTO,
+     * or with status {@code 400 (Bad Request)} if the request is invalid.
+     */
+    @PostMapping("/calculate")
+    public ResponseEntity<VoucherCalculateResponseDTO> calculateDiscount(@Valid @RequestBody VoucherCalculateRequestDTO request) {
+        LOG.debug("REST request to calculate discount for voucher: {}", request.getVoucherCode());
+
+        // Lấy customerId từ user hiện tại
+        Long customerId = null;
+        Optional<Long> userIdOpt = SecurityUtils.getCurrentUserId();
+        if (userIdOpt.isPresent()) {
+            Long userId = userIdOpt.get();
+            customerId = customerRepository
+                .findByUserId(userId)
+                .map(customer -> customer.getId())
+                .orElse(null);
+        }
+
+        if (customerId == null) {
+            throw new BadRequestAlertException(
+                "Không tìm thấy thông tin khách hàng. Vui lòng đăng nhập lại.",
+                ENTITY_NAME,
+                "customernotfound"
+            );
+        }
+
+        try {
+            VoucherCalculateResponseDTO response = voucherService.calculateDiscount(request, customerId);
+            return ResponseEntity.ok().body(response);
+        } catch (IllegalArgumentException e) {
+            throw new BadRequestAlertException(e.getMessage(), ENTITY_NAME, "voucherinvalid");
+        }
     }
 }

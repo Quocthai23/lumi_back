@@ -175,4 +175,52 @@ public class FlashSaleProductResource {
             .headers(HeaderUtil.createEntityDeletionAlert(applicationName, true, ENTITY_NAME, id.toString()))
             .build();
     }
+
+    /**
+     * {@code GET  /flash-sale-products/flash-sale/:flashSaleId} : get all flash sale products by flash sale id.
+     *
+     * @param flashSaleId the id of the flash sale.
+     * @return the {@link ResponseEntity} with status {@code 200 (OK)} and the list of flash sale products in body.
+     */
+    @GetMapping("/flash-sale/{flashSaleId}")
+    public List<FlashSaleProductDTO> getFlashSaleProductsByFlashSaleId(@PathVariable("flashSaleId") Long flashSaleId) {
+        LOG.debug("REST request to get FlashSaleProducts by flashSaleId : {}", flashSaleId);
+        return flashSaleProductService.findByFlashSaleId(flashSaleId);
+    }
+
+    /**
+     * {@code GET  /flash-sale-products/product/:productId} : get all flash sale products by product id.
+     *
+     * @param productId the id of the product.
+     * @return the {@link ResponseEntity} with status {@code 200 (OK)} and the list of flash sale products in body.
+     */
+    @GetMapping("/product/{productId}")
+    public List<FlashSaleProductDTO> getFlashSaleProductsByProductId(@PathVariable("productId") Long productId) {
+        LOG.debug("REST request to get FlashSaleProducts by productId : {}", productId);
+        return flashSaleProductService.findByProductId(productId);
+    }
+
+    /**
+     * {@code GET  /flash-sale-products/product/:productId/active} : get active flash sale product by product id.
+     *
+     * @param productId the id of the product.
+     * @return the {@link ResponseEntity} with status {@code 200 (OK)} and with body the flashSaleProductDTO, or with status {@code 404 (Not Found)}.
+     */
+    @GetMapping("/product/{productId}/active")
+    public ResponseEntity<FlashSaleProductDTO> getActiveFlashSaleProductByProductId(@PathVariable("productId") Long productId) {
+        LOG.debug("REST request to get active FlashSaleProduct by productId : {}", productId);
+        Optional<FlashSaleProductDTO> flashSaleProductDTO = flashSaleProductService.findActiveByProductId(productId);
+        return ResponseUtil.wrapOrNotFound(flashSaleProductDTO);
+    }
+
+    /**
+     * {@code GET  /flash-sale-products/available} : get all available flash sale products (quantity > sold).
+     *
+     * @return the {@link ResponseEntity} with status {@code 200 (OK)} and the list of available flash sale products in body.
+     */
+    @GetMapping("/available")
+    public List<FlashSaleProductDTO> getAvailableFlashSaleProducts() {
+        LOG.debug("REST request to get all available FlashSaleProducts");
+        return flashSaleProductService.findAvailableProducts();
+    }
 }

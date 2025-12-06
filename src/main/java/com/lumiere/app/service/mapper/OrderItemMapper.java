@@ -1,11 +1,7 @@
 package com.lumiere.app.service.mapper;
 
 import com.lumiere.app.domain.OrderItem;
-import com.lumiere.app.domain.Orders;
-import com.lumiere.app.domain.ProductVariant;
 import com.lumiere.app.service.dto.OrderItemDTO;
-import com.lumiere.app.service.dto.OrdersDTO;
-import com.lumiere.app.service.dto.ProductVariantDTO;
 import org.mapstruct.*;
 
 /**
@@ -15,12 +11,9 @@ import org.mapstruct.*;
 public interface OrderItemMapper extends EntityMapper<OrderItemDTO, OrderItem> {
     @Override
     @Mapping(target = "productVariant", source = "productVariant")
+    @Mapping(target = "order", ignore = true)
     OrderItemDTO toDto(OrderItem s);
 
-    // Nếu vẫn cần bản "mỏng":
-    // @Mapping(target = "order", source = "order", qualifiedByName = "ordersCode")
-    // @Mapping(target = "productVariant", source = "productVariant", qualifiedByName = "productVariantSku")
-    // OrderItemDTO toDtoSlim(OrderItem s);
     @Override
     OrderItem toEntity(OrderItemDTO dto);
 

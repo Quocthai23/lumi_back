@@ -3,7 +3,6 @@ package com.lumiere.app.config;
 import jakarta.servlet.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.boot.web.server.*;
 import org.springframework.boot.web.servlet.ServletContextInitializer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -50,6 +49,20 @@ public class WebConfigurer implements ServletContextInitializer {
             source.registerCorsConfiguration("/management/**", config);
             source.registerCorsConfiguration("/v3/api-docs", config);
             source.registerCorsConfiguration("/swagger-ui/**", config);
+            // Add CORS configuration for WebSocket endpoints
+            source.registerCorsConfiguration("/ws/**", config);
+            source.registerCorsConfiguration("/sockjs/**", config);
+        } else {
+            // If CORS is not configured in properties, create a default config for WebSocket
+            // This allows WebSocket connections from any origin in development
+            CorsConfiguration wsConfig = new CorsConfiguration();
+            wsConfig.addAllowedOriginPattern("*");
+            wsConfig.addAllowedMethod("*");
+            wsConfig.addAllowedHeader("*");
+            wsConfig.setAllowCredentials(true);
+            source.registerCorsConfiguration("/ws/**", wsConfig);
+            source.registerCorsConfiguration("/sockjs/**", wsConfig);
+            LOG.debug("Registering default CORS filter for WebSocket endpoints");
         }
         return new CorsFilter(source);
     }

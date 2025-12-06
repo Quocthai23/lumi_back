@@ -117,4 +117,63 @@ public class MailService {
         LOG.debug("Sending password reset email to '{}'", user.getEmail());
         sendEmailFromTemplateSync(user, "mail/passwordResetEmail", "email.reset.title");
     }
+
+    /**
+     * Gửi email thông báo flash sale cho người dùng.
+     *
+     * @param user người dùng nhận email
+     * @param flashSaleName tên flash sale
+     * @param productName tên sản phẩm
+     * @param salePrice giá giảm
+     * @param originalPrice giá gốc
+     * @param productUrl URL sản phẩm
+     */
+    @Async
+    public void sendFlashSaleNotificationEmail(
+        User user,
+        String flashSaleName,
+        String productName,
+        java.math.BigDecimal salePrice,
+        java.math.BigDecimal originalPrice,
+        String productUrl
+    ) {
+        sendFlashSaleNotificationEmailSync(user, flashSaleName, productName, salePrice, originalPrice, productUrl);
+    }
+
+    private void sendFlashSaleNotificationEmailSync(
+        User user,
+        String flashSaleName,
+        String productName,
+        java.math.BigDecimal salePrice,
+        java.math.BigDecimal originalPrice,
+        String productUrl
+    ) {
+        if (user.getEmail() == null) {
+            LOG.debug("Email doesn't exist for user '{}'", user.getLogin());
+            return;
+        }
+        Locale locale = Locale.forLanguageTag(user.getLangKey());
+        Context context = new Context(locale);
+        context.setVariable(USER, user);
+        context.setVariable(BASE_URL, jHipsterProperties.getMail().getBaseUrl());
+        context.setVariable("flashSaleName", flashSaleName);
+        context.setVariable("productName", productName);
+        context.setVariable("salePrice", salePrice);
+        context.setVariable("originalPrice", originalPrice);
+        context.setVariable("productUrl", productUrl);
+        context.setVariable("discountPercent", calculateDiscountPercent(originalPrice, salePrice));
+        String content = templateEngine.process("mail/flashSaleNotification", context);
+        String subject = messageSource.getMessage("email.flashSale.title", new Object[] { flashSaleName }, locale);
+        sendEmailSync(user.getEmail(), subject, content, false, true);
+    }
+
+    private int calculateDiscountPercent(java.math.BigDecimal originalPrice, java.math.BigDecimal salePrice) {
+        if (originalPrice == null || salePrice == null || originalPrice.compareTo(java.math.BigDecimal.ZERO) == 0) {
+            return 0;
+        }
+        java.math.BigDecimal discount = originalPrice.subtract(salePrice);
+        java.math.BigDecimal percent = discount.divide(originalPrice, 2, java.math.RoundingMode.HALF_UP)
+            .multiply(new java.math.BigDecimal(100));
+        return percent.intValue();
+    }
 }

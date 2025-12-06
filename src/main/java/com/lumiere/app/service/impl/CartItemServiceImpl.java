@@ -1,10 +1,14 @@
 package com.lumiere.app.service.impl;
 
 import com.lumiere.app.domain.CartItem;
+import com.lumiere.app.domain.ProductVariant;
 import com.lumiere.app.repository.CartItemRepository;
+import com.lumiere.app.repository.ProductVariantRepository;
 import com.lumiere.app.service.CartItemService;
 import com.lumiere.app.service.dto.CartItemDTO;
+import com.lumiere.app.service.dto.ProductVariantDTO;
 import com.lumiere.app.service.mapper.CartItemMapper;
+import com.lumiere.app.service.mapper.ProductVariantMapper;
 import com.lumiere.app.utils.MergeUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -15,7 +19,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.Instant;
-import java.util.Optional;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @Transactional
@@ -26,10 +31,14 @@ public class CartItemServiceImpl implements CartItemService {
     private final CartItemRepository cartItemRepository;
 
     private final CartItemMapper cartItemMapper;
+    private final ProductVariantRepository productVariantRepository;
+    private final ProductVariantMapper productVariantMapper;
 
-    public CartItemServiceImpl(CartItemRepository cartItemRepository, CartItemMapper cartItemMapper) {
+    public CartItemServiceImpl(CartItemRepository cartItemRepository, CartItemMapper cartItemMapper, ProductVariantRepository productVariantRepository, ProductVariantMapper productVariantMapper) {
         this.cartItemRepository = cartItemRepository;
         this.cartItemMapper = cartItemMapper;
+        this.productVariantRepository = productVariantRepository;
+        this.productVariantMapper = productVariantMapper;
     }
 
     @Override
@@ -57,6 +66,14 @@ public class CartItemServiceImpl implements CartItemService {
     @Override
     public CartItemDTO update(CartItemDTO cartItemDTO) {
         log.debug("Request to update CartItem : {}", cartItemDTO);
+        Optional<CartItemDTO> exist = this.findOne(cartItemDTO.getId());
+
+        if (exist.isEmpty()) {
+            throw new IllegalArgumentException();
+        }
+
+
+        cartItemDTO.setCustomerId(exist.get().getCustomerId());
 
         if (cartItemDTO.getQuantity() != null && cartItemDTO.getUnitPrice() != null) {
             BigDecimal total = cartItemDTO.getUnitPrice()
@@ -140,6 +157,30 @@ public class CartItemServiceImpl implements CartItemService {
         return cartItemRepository.findAllByCustomerId(customerId, pageable).map(cartItemMapper::toDto);
     }
 
+    @Transactional(readOnly = true)
+    @Override
+    public List<CartItemDTO> findAllByCustomerId(Long customerId) {
+        List<CartItem> items = cartItemRepository.findAllByCustomerId(customerId);
+        if (items.isEmpty()) return Collections.emptyList();
+
+        Set<Long> variantIds = items.stream()
+            .map(CartItem::getVariantId)
+            .filter(Objects::nonNull)
+            .collect(Collectors.toSet());
+
+        List<ProductVariantDTO> variants = productVariantRepository.findAllByIdIn(variantIds).stream().map(productVariantMapper::toDto).toList();
+        Map<Long, ProductVariantDTO> variantById = variants.stream()
+            .collect(Collectors.toMap(ProductVariantDTO::getId, v -> v));
+
+        return items.stream()
+            .map(item -> {
+                CartItemDTO dto = cartItemMapper.toDto(item);
+                dto.setVariant(variantById.get(item.getVariantId()));
+                return dto;
+            })
+            .collect(Collectors.toList());
+    }
+
     @Override
     public CartItemDTO findByCustomerIdAndVariantId(Long customerId, Long variantId){
         return cartItemMapper.toDto(cartItemRepository.findCartItemByCustomerIdAndVariantId(customerId,variantId));
@@ -162,8 +203,34 @@ public class CartItemServiceImpl implements CartItemService {
             cartItemDTO.setCustomerId(userId);
             cartItemDTO.setCreatedDate(Instant.now());
             cartItemDTO.setLastModifiedDate(Instant.now());
+            cartItemDTO.setTotalPrice(cartItemDTO.getUnitPrice().multiply(BigDecimal.valueOf(cartItemDTO.getQuantity())));
             exist = this.save(cartItemDTO);
         }
         return exist;
+    }
+
+    @Override
+    public CartItemDTO addToCart(Long userId, Long variantId, int qty) {
+        if (qty <= 0) throw new IllegalArgumentException("qty must be > 0");
+
+        CartItem item = cartItemRepository.findCartItemByCustomerIdAndVariantId(userId, variantId);
+        long newQtyLong = (long) item.getQuantity() + qty;
+        if (newQtyLong > Integer.MAX_VALUE) {
+            item.setQuantity(Integer.MAX_VALUE);
+        } else {
+            item.setQuantity(item.getQuantity() + qty);
+        }
+
+        CartItem saved = cartItemRepository.save(item);
+
+        Optional<ProductVariant> pvOpt = productVariantRepository.findById(variantId);
+
+        CartItemDTO dto = cartItemMapper.toDto(saved);
+        if (pvOpt.isPresent()) {
+            ProductVariant pv = pvOpt.get();
+            dto.setTotalPrice(pv.getPrice().multiply(BigDecimal.valueOf(pv.getStockQuantity())));
+            dto.setVariantStock(pv.getStockQuantity());
+        }
+        return dto;
     }
 }

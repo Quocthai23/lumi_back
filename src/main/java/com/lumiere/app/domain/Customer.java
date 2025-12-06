@@ -5,6 +5,7 @@ import com.lumiere.app.domain.enumeration.CustomerTier;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
 import java.io.Serializable;
+import java.time.LocalDate;
 import java.util.HashSet;
 import java.util.Set;
 import org.hibernate.annotations.Cache;
@@ -44,6 +45,9 @@ public class  Customer implements Serializable {
     @Min(value = 0)
     @Column(name = "loyalty_points")
     private Integer loyaltyPoints;
+
+    @Column(name = "birthday")
+    private LocalDate birthday;
 
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(unique = true)
@@ -157,6 +161,19 @@ public class  Customer implements Serializable {
 
     public void setLoyaltyPoints(Integer loyaltyPoints) {
         this.loyaltyPoints = loyaltyPoints;
+    }
+
+    public LocalDate getBirthday() {
+        return this.birthday;
+    }
+
+    public Customer birthday(LocalDate birthday) {
+        this.setBirthday(birthday);
+        return this;
+    }
+
+    public void setBirthday(LocalDate birthday) {
+        this.birthday = birthday;
     }
 
     public User getUser() {
@@ -348,6 +365,7 @@ public class  Customer implements Serializable {
             ", phone='" + getPhone() + "'" +
             ", tier='" + getTier() + "'" +
             ", loyaltyPoints=" + getLoyaltyPoints() +
+            ", birthday='" + getBirthday() + "'" +
             "}";
     }
 }

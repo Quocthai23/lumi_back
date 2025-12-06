@@ -168,4 +168,49 @@ public class FlashSaleResource {
             .headers(HeaderUtil.createEntityDeletionAlert(applicationName, true, ENTITY_NAME, id.toString()))
             .build();
     }
+
+    /**
+     * {@code GET  /flash-sales/active} : get all active flash sales.
+     *
+     * @return the {@link ResponseEntity} with status {@code 200 (OK)} and the list of active flash sales in body.
+     */
+    @GetMapping("/active")
+    public List<FlashSaleDTO> getActiveFlashSales() {
+        LOG.debug("REST request to get all active FlashSales");
+        return flashSaleService.findActiveFlashSales();
+    }
+
+    /**
+     * {@code GET  /flash-sales/upcoming} : get all upcoming flash sales.
+     *
+     * @return the {@link ResponseEntity} with status {@code 200 (OK)} and the list of upcoming flash sales in body.
+     */
+    @GetMapping("/upcoming")
+    public List<FlashSaleDTO> getUpcomingFlashSales() {
+        LOG.debug("REST request to get all upcoming FlashSales");
+        return flashSaleService.findUpcomingFlashSales();
+    }
+
+    /**
+     * {@code GET  /flash-sales/ended} : get all ended flash sales.
+     *
+     * @return the {@link ResponseEntity} with status {@code 200 (OK)} and the list of ended flash sales in body.
+     */
+    @GetMapping("/ended")
+    public List<FlashSaleDTO> getEndedFlashSales() {
+        LOG.debug("REST request to get all ended FlashSales");
+        return flashSaleService.findEndedFlashSales();
+    }
+
+    /**
+     * {@code GET  /flash-sales/current} : get the current active flash sale.
+     *
+     * @return the {@link ResponseEntity} with status {@code 200 (OK)} and with body the current flashSaleDTO, or with status {@code 404 (Not Found)}.
+     */
+    @GetMapping("/current")
+    public ResponseEntity<FlashSaleDTO> getCurrentFlashSale() {
+        LOG.debug("REST request to get current FlashSale");
+        Optional<FlashSaleDTO> flashSaleDTO = flashSaleService.findCurrentFlashSale();
+        return ResponseUtil.wrapOrNotFound(flashSaleDTO);
+    }
 }

@@ -63,4 +63,35 @@ public interface FlashSaleProductService {
      * @param id the id of the entity.
      */
     void delete(Long id);
+
+    /**
+     * Get all flash sale products by flash sale id.
+     *
+     * @param flashSaleId the id of the flash sale.
+     * @return the list of flash sale products.
+     */
+    List<FlashSaleProductDTO> findByFlashSaleId(Long flashSaleId);
+
+    /**
+     * Get active flash sale product by product id.
+     *
+     * @param productId the id of the product.
+     * @return the flash sale product if found and active.
+     */
+    Optional<FlashSaleProductDTO> findActiveByProductId(Long productId);
+
+    /**
+     * Get all flash sale products by product id.
+     *
+     * @param productId the id of the product.
+     * @return the list of flash sale products.
+     */
+    List<FlashSaleProductDTO> findByProductId(Long productId);
+
+    /**
+     * Get all available flash sale products (quantity > sold).
+     *
+     * @return the list of available flash sale products.
+     */
+    List<FlashSaleProductDTO> findAvailableProducts();
 }

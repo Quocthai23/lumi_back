@@ -154,4 +154,13 @@ public class CartItemResource {
             .headers(HeaderUtil.createEntityDeletionAlert(applicationName, false, ENTITY_NAME, id.toString()))
             .build();
     }
+
+    @GetMapping("/cart-items/user/{userId}")
+    public ResponseEntity<List<CartItemDTO>> getCartItemByUserId(
+        @PathVariable Long userId
+    ){
+        log.debug("REST request to get CartItems by userId : {}", userId);
+        List<CartItemDTO> cartItemDTOS = cartItemService.findAllByCustomerId(userId);
+        return ResponseEntity.ok().body(cartItemDTOS);
+    }
 }

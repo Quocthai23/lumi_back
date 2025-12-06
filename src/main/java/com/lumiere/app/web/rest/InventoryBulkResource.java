@@ -1,6 +1,5 @@
-// src/main/java/com/lumi/app/web/rest/InventoryBulkResource.java
 package com.lumiere.app.web.rest;
-;
+
 import com.lumiere.app.service.InventoryBulkService;
 import com.lumiere.app.service.dto.BulkAdjustRequestDTO;
 import com.lumiere.app.service.dto.BulkAdjustResponseDTO;

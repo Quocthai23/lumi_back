@@ -53,4 +53,32 @@ public interface FlashSaleService {
      * @param id the id of the entity.
      */
     void delete(Long id);
+
+    /**
+     * Get all active flash sales (currently running).
+     *
+     * @return the list of active flash sales.
+     */
+    List<FlashSaleDTO> findActiveFlashSales();
+
+    /**
+     * Get all upcoming flash sales.
+     *
+     * @return the list of upcoming flash sales.
+     */
+    List<FlashSaleDTO> findUpcomingFlashSales();
+
+    /**
+     * Get all ended flash sales.
+     *
+     * @return the list of ended flash sales.
+     */
+    List<FlashSaleDTO> findEndedFlashSales();
+
+    /**
+     * Get current active flash sale (first one if multiple).
+     *
+     * @return the current flash sale, or empty if none.
+     */
+    Optional<FlashSaleDTO> findCurrentFlashSale();
 }

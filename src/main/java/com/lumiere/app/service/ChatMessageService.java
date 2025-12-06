@@ -53,4 +53,22 @@ public interface ChatMessageService {
      * @param id the id of the entity.
      */
     void delete(Long id);
+
+    /**
+     * Save a chatMessage with contactMessageId.
+     *
+     * @param message the message text.
+     * @param contactMessageId the contactMessage id.
+     * @param sender the sender (can be "admin", "user", etc.).
+     * @return the persisted entity.
+     */
+    ChatMessageDTO saveMessageForContact(String message, Long contactMessageId, String sender);
+
+    /**
+     * Get all messages for a contactMessage.
+     *
+     * @param contactMessageId the contactMessage id.
+     * @return the list of messages.
+     */
+    List<ChatMessageDTO> findByContactMessageId(Long contactMessageId);
 }

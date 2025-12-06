@@ -93,15 +93,8 @@ public class OrderItemServiceImpl implements OrderItemService {
     @Override
     public List<OrderItemDTO> findAllByOrderId(Long orderId) {
         LOG.debug("Request to get OrderItems by orderId : {}", orderId);
-        return orderItemRepository.findAllByOrderId(orderId)
+        return orderItemRepository.findAllByOrderIdWithVariants(orderId)
             .stream()
-            .map(orderItemDTO -> {
-                Optional<OrderItem> optional = orderItemRepository.findOneWithEagerRelationships(orderItemDTO.getId());
-                if(optional.isPresent()){
-                    orderItemDTO = optional.get();
-                }
-                return orderItemDTO;
-            })
             .map(orderItemMapper::toDto)
             .collect(Collectors.toList());
     }

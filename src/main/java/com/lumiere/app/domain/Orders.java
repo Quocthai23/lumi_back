@@ -3,6 +3,7 @@ package com.lumiere.app.domain;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.lumiere.app.domain.enumeration.OrderStatus;
 import com.lumiere.app.domain.enumeration.PaymentStatus;
+import com.lumiere.app.domain.Voucher;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
 import java.io.Serializable;
@@ -65,9 +66,17 @@ public class Orders implements Serializable {
     @Column(name = "redeemed_points")
     private Integer redeemedPoints;
 
+    @DecimalMin(value = "0")
+    @Column(name = "discount_amount", precision = 21, scale = 2)
+    private BigDecimal discountAmount;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JsonIgnoreProperties(value = { "user", "orders", "wishlists", "addresses", "loyaltyHistories", "notifications" }, allowSetters = true)
     private Customer customer;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JsonIgnoreProperties(value = {}, allowSetters = true)
+    private Voucher voucher;
 
     @OneToMany(fetch = FetchType.LAZY, mappedBy = "order")
     @Cache(usage = CacheConcurrencyStrategy.READ_WRITE)
@@ -198,6 +207,19 @@ public class Orders implements Serializable {
         this.redeemedPoints = redeemedPoints;
     }
 
+    public BigDecimal getDiscountAmount() {
+        return this.discountAmount;
+    }
+
+    public Orders discountAmount(BigDecimal discountAmount) {
+        this.setDiscountAmount(discountAmount);
+        return this;
+    }
+
+    public void setDiscountAmount(BigDecimal discountAmount) {
+        this.discountAmount = discountAmount;
+    }
+
     public Customer getCustomer() {
         return this.customer;
     }
@@ -273,6 +295,19 @@ public class Orders implements Serializable {
         return this;
     }
 
+    public Voucher getVoucher() {
+        return this.voucher;
+    }
+
+    public void setVoucher(Voucher voucher) {
+        this.voucher = voucher;
+    }
+
+    public Orders voucher(Voucher voucher) {
+        this.setVoucher(voucher);
+        return this;
+    }
+
     // jhipster-needle-entity-add-getters-setters - JHipster will add getters and setters here
 
     @Override
@@ -305,6 +340,7 @@ public class Orders implements Serializable {
             ", paymentMethod='" + getPaymentMethod() + "'" +
             ", placedAt='" + getPlacedAt() + "'" +
             ", redeemedPoints=" + getRedeemedPoints() +
+            ", discountAmount=" + getDiscountAmount() +
             "}";
     }
 }

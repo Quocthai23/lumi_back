@@ -54,6 +54,26 @@ spring:
     password:
   thymeleaf:
     cache: true
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      group-id: ${KAFKA_CONSUMER_GROUP_ID:lumiere-group-prod}
+      auto-offset-reset: latest
+      enable-auto-commit: false
+      properties:
+        max.poll.records: 500
+        max.poll.interval.ms: 300000
+    producer:
+      properties:
+        acks: all
+        retries: 3
+        max-in-flight-requests-per-connection: 5
+        enable-idempotence: true
+        compression.type: snappy
+    listener:
+      ack-mode: manual
+      concurrency: 5
+      type: batch
 
 # ===================================================================
 # To enable TLS in production, generate a certificate using:

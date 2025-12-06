@@ -39,4 +39,10 @@ public interface OrderStatusHistoryRepository extends JpaRepository<OrderStatusH
         "select orderStatusHistory from OrderStatusHistory orderStatusHistory left join fetch orderStatusHistory.order where orderStatusHistory.id =:id"
     )
     Optional<OrderStatusHistory> findOneWithToOneRelationships(@Param("id") Long id);
+
+    /**
+     * Tìm lịch sử trạng thái đơn hàng theo ID đơn hàng, sắp xếp theo thời gian giảm dần.
+     */
+    @Query("select h from OrderStatusHistory h where h.order.id = :orderId order by h.timestamp desc")
+    List<OrderStatusHistory> findByOrderIdOrderByTimestampDesc(@Param("orderId") Long orderId);
 }

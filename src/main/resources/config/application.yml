@@ -176,6 +176,25 @@ spring:
   output:
     ansi:
       console-available: true
+  kafka:
+    bootstrap-servers: localhost:9092
+    consumer:
+      group-id: lumiere-group
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      properties:
+        spring.json.trusted.packages: '*'
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      properties:
+        acks: all
+        retries: 3
+        max-in-flight-requests-per-connection: 5
+    listener:
+      ack-mode: batch
+      concurrency: 3
 
 server:
   servlet:
@@ -206,7 +225,7 @@ jhipster:
   #   allowed-methods: "*"
   #   allowed-headers: "*"
   #   exposed-headers: "Authorization,Link,X-Total-Count,X-${jhipster.clientApp.name}-alert,X-${jhipster.clientApp.name}-error,X-${jhipster.clientApp.name}-params"
-  #   allow-credentials: true
+#     allow-credentials: true
   #   max-age: 1800
   mail:
     from: lumiere@localhost

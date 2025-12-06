@@ -43,6 +43,10 @@ public class ChatMessage implements Serializable {
     @JsonIgnoreProperties(value = { "messages" }, allowSetters = true)
     private ChatSession session;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JsonIgnoreProperties(value = { "chatMessages" }, allowSetters = true)
+    private ContactMessage contactMessage;
+
     // jhipster-needle-entity-add-field - JHipster will add fields here
 
     public Long getId() {
@@ -107,6 +111,19 @@ public class ChatMessage implements Serializable {
 
     public ChatMessage session(ChatSession chatSession) {
         this.setSession(chatSession);
+        return this;
+    }
+
+    public ContactMessage getContactMessage() {
+        return this.contactMessage;
+    }
+
+    public void setContactMessage(ContactMessage contactMessage) {
+        this.contactMessage = contactMessage;
+    }
+
+    public ChatMessage contactMessage(ContactMessage contactMessage) {
+        this.setContactMessage(contactMessage);
         return this;
     }
 

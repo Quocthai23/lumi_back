@@ -48,8 +48,6 @@ public class OrderItem implements Serializable {
     @JsonIgnoreProperties(value = { "product" }, allowSetters = true)
     private ProductVariant productVariant;
 
-    // jhipster-needle-entity-add-field - JHipster will add fields here
-
     public Long getId() {
         return this.id;
     }

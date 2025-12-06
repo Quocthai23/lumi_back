@@ -1,0 +1,172 @@
+<!doctype html>
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}" lang="vi">
+  <head>
+    <title th:text="#{email.flashSale.title(${flashSaleName})}">Flash Sale - Lumiere</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" th:href="@{|${baseUrl}/favicon.ico|}" />
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        line-height: 1.6;
+        color: #333;
+        max-width: 600px;
+        margin: 0 auto;
+        padding: 20px;
+        background-color: #f4f4f4;
+      }
+      .container {
+        background-color: #ffffff;
+        border-radius: 8px;
+        padding: 30px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      }
+      .header {
+        text-align: center;
+        margin-bottom: 30px;
+      }
+      .header h1 {
+        color: #e74c3c;
+        margin: 0;
+        font-size: 28px;
+      }
+      .flash-sale-badge {
+        display: inline-block;
+        background-color: #e74c3c;
+        color: white;
+        padding: 8px 16px;
+        border-radius: 20px;
+        font-weight: bold;
+        font-size: 14px;
+        margin-bottom: 20px;
+      }
+      .product-info {
+        background-color: #f8f9fa;
+        border-radius: 8px;
+        padding: 20px;
+        margin: 20px 0;
+      }
+      .product-name {
+        font-size: 22px;
+        font-weight: bold;
+        color: #2c3e50;
+        margin-bottom: 15px;
+      }
+      .price-section {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        margin: 15px 0;
+      }
+      .sale-price {
+        font-size: 28px;
+        font-weight: bold;
+        color: #e74c3c;
+      }
+      .original-price {
+        font-size: 18px;
+        color: #7f8c8d;
+        text-decoration: line-through;
+      }
+      .discount-badge {
+        background-color: #27ae60;
+        color: white;
+        padding: 5px 12px;
+        border-radius: 15px;
+        font-size: 14px;
+        font-weight: bold;
+      }
+      .cta-button {
+        display: inline-block;
+        background-color: #e74c3c;
+        color: white;
+        padding: 15px 30px;
+        text-decoration: none;
+        border-radius: 5px;
+        font-weight: bold;
+        font-size: 16px;
+        text-align: center;
+        margin: 20px 0;
+        transition: background-color 0.3s;
+      }
+      .cta-button:hover {
+        background-color: #c0392b;
+      }
+      .footer {
+        margin-top: 30px;
+        padding-top: 20px;
+        border-top: 1px solid #ecf0f1;
+        text-align: center;
+        color: #7f8c8d;
+        font-size: 14px;
+      }
+      .greeting {
+        font-size: 16px;
+        margin-bottom: 20px;
+      }
+      .message {
+        font-size: 15px;
+        margin-bottom: 20px;
+        color: #555;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <div class="flash-sale-badge" th:text="#{email.flashSale.badge}">FLASH SALE</div>
+        <h1 th:text="#{email.flashSale.title(${flashSaleName})}">Flash Sale - [[${flashSaleName}]]</h1>
+      </div>
+
+      <p class="greeting" th:text="#{email.flashSale.greeting(${user.login})}">
+        Xin chào [[${user.login}]],
+      </p>
+
+      <p class="message" th:text="#{email.flashSale.text1}">
+        Chúng tôi rất vui mừng thông báo đến bạn về chương trình Flash Sale đặc biệt!
+      </p>
+
+      <div class="product-info">
+        <div class="product-name" th:text="${productName}">[[${productName}]]</div>
+        
+        <div class="price-section">
+          <span class="sale-price" th:text="${#numbers.formatDecimal(salePrice, 0, 'COMMA', 0, 'POINT')} + ' ₫'">
+            [[${#numbers.formatDecimal(salePrice, 0, 'COMMA', 0, 'POINT')}]] ₫
+          </span>
+          <span class="original-price" th:if="${originalPrice != null and originalPrice.compareTo(salePrice) > 0}" 
+                th:text="${#numbers.formatDecimal(originalPrice, 0, 'COMMA', 0, 'POINT')} + ' ₫'">
+            [[${#numbers.formatDecimal(originalPrice, 0, 'COMMA', 0, 'POINT')}]] ₫
+          </span>
+          <span class="discount-badge" th:if="${discountPercent > 0}" 
+                th:text="'-' + ${discountPercent} + '%'">
+            -[[${discountPercent}]]%
+          </span>
+        </div>
+      </div>
+
+      <p class="message" th:text="#{email.flashSale.text2}">
+        Đây là cơ hội tuyệt vời để sở hữu sản phẩm yêu thích với mức giá ưu đãi đặc biệt. Hãy nhanh tay đặt hàng trước khi hết!
+      </p>
+
+      <div style="text-align: center;">
+        <a th:with="url=(@{|${baseUrl}${productUrl}|})" th:href="${url}" class="cta-button" th:text="#{email.flashSale.button}">
+          Xem sản phẩm ngay
+        </a>
+      </div>
+
+      <p class="message" th:text="#{email.flashSale.text3}">
+        Chương trình có số lượng giới hạn, vui lòng đặt hàng sớm để không bỏ lỡ cơ hội!
+      </p>
+
+      <div class="footer">
+        <p th:text="#{email.flashSale.text4}">
+          Trân trọng,
+        </p>
+        <p>
+          <em th:text="#{email.signature}">Lumiere Team.</em>
+        </p>
+      </div>
+    </div>
+  </body>
+</html>
+

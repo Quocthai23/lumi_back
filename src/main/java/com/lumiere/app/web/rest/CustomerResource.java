@@ -3,8 +3,12 @@ package com.lumiere.app.web.rest;
 import com.lumiere.app.repository.CustomerRepository;
 import com.lumiere.app.service.CustomerQueryService;
 import com.lumiere.app.service.CustomerService;
+import com.lumiere.app.service.CustomerVoucherService;
+import com.lumiere.app.service.LoyaltyService;
 import com.lumiere.app.service.criteria.CustomerCriteria;
 import com.lumiere.app.service.dto.CustomerDTO;
+import com.lumiere.app.service.dto.CustomerVoucherDTO;
+import com.lumiere.app.service.dto.LoyaltyTierDTO;
 import com.lumiere.app.web.rest.errors.BadRequestAlertException;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
@@ -46,14 +50,22 @@ public class CustomerResource {
 
     private final CustomerQueryService customerQueryService;
 
+    private final LoyaltyService loyaltyService;
+
+    private final CustomerVoucherService customerVoucherService;
+
     public CustomerResource(
         CustomerService customerService,
         CustomerRepository customerRepository,
-        CustomerQueryService customerQueryService
+        CustomerQueryService customerQueryService,
+        LoyaltyService loyaltyService,
+        CustomerVoucherService customerVoucherService
     ) {
         this.customerService = customerService;
         this.customerRepository = customerRepository;
         this.customerQueryService = customerQueryService;
+        this.loyaltyService = loyaltyService;
+        this.customerVoucherService = customerVoucherService;
     }
 
     /**
@@ -201,5 +213,31 @@ public class CustomerResource {
         return ResponseEntity.noContent()
             .headers(HeaderUtil.createEntityDeletionAlert(applicationName, true, ENTITY_NAME, id.toString()))
             .build();
+    }
+
+    /**
+     * {@code GET  /customers/loyalty-tier/user/:userId} : get loyalty tier information for a user.
+     *
+     * @param userId the userId of the customer to retrieve loyalty tier.
+     * @return the {@link ResponseEntity} with status {@code 200 (OK)} and with body the LoyaltyTierDTO, or with status {@code 404 (Not Found)}.
+     */
+    @GetMapping("/loyalty-tier/user/{userId}")
+    public ResponseEntity<LoyaltyTierDTO> getLoyaltyTierByUserId(@PathVariable("userId") Long userId) {
+        LOG.debug("REST request to get Loyalty Tier for userId : {}", userId);
+        Optional<LoyaltyTierDTO> loyaltyTierDTO = loyaltyService.getLoyaltyTierByUserId(userId);
+        return ResponseUtil.wrapOrNotFound(loyaltyTierDTO);
+    }
+
+    /**
+     * {@code GET  /customers/vouchers/user/:userId} : get all vouchers gifted to a customer.
+     *
+     * @param userId the userId of the customer to retrieve vouchers.
+     * @return the {@link ResponseEntity} with status {@code 200 (OK)} and with body the list of CustomerVoucherDTO.
+     */
+    @GetMapping("/vouchers/user/{userId}")
+    public ResponseEntity<List<CustomerVoucherDTO>> getVouchersByUserId(@PathVariable("userId") Long userId) {
+        LOG.debug("REST request to get Vouchers for userId : {}", userId);
+        List<CustomerVoucherDTO> vouchers = customerVoucherService.getVouchersByUserId(userId);
+        return ResponseEntity.ok().body(vouchers);
     }
 }

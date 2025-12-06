@@ -85,4 +85,11 @@ public class ProductQuestionServiceImpl implements ProductQuestionService {
         LOG.debug("Request to delete ProductQuestion : {}", id);
         productQuestionRepository.deleteById(id);
     }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<ProductQuestionDTO> findByProductId(Long productId, Pageable pageable) {
+        LOG.debug("Request to get ProductQuestions by productId: {}", productId);
+        return productQuestionRepository.findByProductIdOrderByCreatedAtDesc(productId, pageable).map(productQuestionMapper::toDto);
+    }
 }

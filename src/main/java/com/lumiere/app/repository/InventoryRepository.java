@@ -10,6 +10,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.*;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Spring Data JPA repository for the Inventory entity.
@@ -50,4 +51,37 @@ public interface InventoryRepository extends JpaRepository<Inventory, Long>, Jpa
     @Query("select i from Inventory i where i.id in :ids")
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     List<Inventory> findAllByIdForUpdate(@Param("ids") List<Long> ids);
+
+    /**
+     * Tìm inventory theo productVariant với pessimistic lock để đảm bảo atomic operations.
+     * Lấy tất cả inventory của productVariant từ các warehouse active.
+     *
+     * @param productVariantId ID của product variant
+     * @return danh sách inventory
+     */
+    @Query(
+        "select i from Inventory i " +
+        "left join fetch i.warehouse w " +
+        "where i.productVariant.id = :productVariantId " +
+        "and (w.isActive = true or w.isActive is null) " +
+        "order by i.stockQuantity desc"
+    )
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    List<Inventory> findByProductVariantIdForUpdate(@Param("productVariantId") Long productVariantId);
+
+    /**
+     * Trừ stock quantity một cách atomic.
+     * Chỉ trừ khi stockQuantity >= quantity.
+     *
+     * @param inventoryId ID của inventory
+     * @param quantity số lượng cần trừ
+     * @return số dòng được cập nhật (1 nếu thành công, 0 nếu không đủ hàng)
+     */
+    @Modifying
+    @Transactional
+    @Query(
+        "update Inventory i set i.stockQuantity = i.stockQuantity - :quantity " +
+        "where i.id = :inventoryId and i.stockQuantity >= :quantity"
+    )
+    int deductStockQuantity(@Param("inventoryId") Long inventoryId, @Param("quantity") Long quantity);
 }

@@ -37,4 +37,18 @@ public interface ProductReviewRepository extends JpaRepository<ProductReview, Lo
 
     @Query("select productReview from ProductReview productReview left join fetch productReview.product where productReview.id =:id")
     Optional<ProductReview> findOneWithToOneRelationships(@Param("id") Long id);
+
+    /**
+     * Tìm tất cả reviews đã được approved của một sản phẩm.
+     */
+    @Query(
+        "select productReview from ProductReview productReview " +
+        "left join fetch productReview.product " +
+        "where productReview.product.id = :productId " +
+        "and productReview.status = :status"
+    )
+    List<ProductReview> findByProductIdAndStatus(
+        @Param("productId") Long productId,
+        @Param("status") com.lumiere.app.domain.enumeration.ReviewStatus status
+    );
 }

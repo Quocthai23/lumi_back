@@ -186,4 +186,22 @@ public class ProductQuestionResource {
             .headers(HeaderUtil.createEntityDeletionAlert(applicationName, true, ENTITY_NAME, id.toString()))
             .build();
     }
+
+    /**
+     * {@code GET  /product-questions/product/{productId}} : get all questions for a product.
+     *
+     * @param productId the product ID.
+     * @param pageable the pagination information.
+     * @return the {@link ResponseEntity} with status {@code 200 (OK)} and the list of productQuestions in body.
+     */
+    @GetMapping("/product/{productId}")
+    public ResponseEntity<List<ProductQuestionDTO>> getProductQuestionsByProduct(
+        @PathVariable Long productId,
+        @org.springdoc.core.annotations.ParameterObject Pageable pageable
+    ) {
+        LOG.debug("REST request to get ProductQuestions for product: {}", productId);
+        Page<ProductQuestionDTO> page = productQuestionService.findByProductId(productId, pageable);
+        HttpHeaders headers = PaginationUtil.generatePaginationHttpHeaders(ServletUriComponentsBuilder.fromCurrentRequest(), page);
+        return ResponseEntity.ok().headers(headers).body(page.getContent());
+    }
 }

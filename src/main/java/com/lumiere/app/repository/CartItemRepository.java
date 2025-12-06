@@ -6,8 +6,11 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.*;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
+
 @Repository
 public interface CartItemRepository extends JpaRepository<CartItem, Long>, JpaSpecificationExecutor<CartItem> {
     Page<CartItem> findAllByCustomerId(Long customerId, Pageable pageable);
+    List<CartItem> findAllByCustomerId(Long customerId);
     CartItem findCartItemByCustomerIdAndVariantId(Long customerId, Long variantId);
 }

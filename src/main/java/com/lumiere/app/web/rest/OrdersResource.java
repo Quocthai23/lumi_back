@@ -1,11 +1,15 @@
 package com.lumiere.app.web.rest;
 
+import com.lumiere.app.domain.enumeration.OrderStatus;
+import com.lumiere.app.repository.CustomerRepository;
 import com.lumiere.app.repository.OrdersRepository;
 import com.lumiere.app.service.OrdersQueryService;
 import com.lumiere.app.service.OrdersService;
 import com.lumiere.app.service.criteria.OrdersCriteria;
+import com.lumiere.app.service.dto.OrderStatusHistoryDTO;
 import com.lumiere.app.service.dto.OrdersDTO;
 import com.lumiere.app.web.rest.errors.BadRequestAlertException;
+import com.lumiere.app.security.SecurityUtils;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
@@ -48,10 +52,18 @@ public class OrdersResource {
 
     private final OrdersQueryService ordersQueryService;
 
-    public OrdersResource(OrdersService ordersService, OrdersRepository ordersRepository, OrdersQueryService ordersQueryService) {
+    private final CustomerRepository customerRepository;
+
+    public OrdersResource(
+        OrdersService ordersService,
+        OrdersRepository ordersRepository,
+        OrdersQueryService ordersQueryService,
+        CustomerRepository customerRepository
+    ) {
         this.ordersService = ordersService;
         this.ordersRepository = ordersRepository;
         this.ordersQueryService = ordersQueryService;
+        this.customerRepository = customerRepository;
     }
 
     /**
@@ -215,5 +227,236 @@ public class OrdersResource {
         HttpServletResponse response
     ) {
         ordersService.writeOrderInvoiceExcel(orderId, response);
+    }
+
+    /**
+     * {@code POST  /orders/create-from-cart} : Tạo đơn hàng từ giỏ hàng.
+     *
+     * @param request thông tin tạo đơn hàng
+     * @return the {@link ResponseEntity} with status {@code 201 (Created)} and with body the new ordersDTO.
+     */
+    @PostMapping("/create-from-cart")
+    public ResponseEntity<OrdersDTO> createOrderFromCart(@Valid @RequestBody CreateOrderRequest request) {
+        LOG.debug("REST request to create order from cart: {}", request);
+        OrdersDTO ordersDTO = ordersService.createOrderFromCart(
+            request.getPaymentMethod(),
+            request.getNote(),
+            request.getRedeemedPoints(),
+            request.getVoucherCode()
+        );
+        return ResponseEntity.ok().body(ordersDTO);
+    }
+
+    /**
+     * {@code PUT  /orders/{id}/status} : Cập nhật trạng thái đơn hàng.
+     *
+     * @param id ID đơn hàng
+     * @param request thông tin cập nhật trạng thái
+     * @return the {@link ResponseEntity} with status {@code 200 (OK)} and with body the updated ordersDTO.
+     */
+    @PutMapping("/{id}/status")
+    public ResponseEntity<OrdersDTO> updateOrderStatus(
+        @PathVariable Long id,
+        @Valid @RequestBody UpdateOrderStatusRequest request
+    ) {
+        LOG.debug("REST request to update order status: {} to {}", id, request.getStatus());
+        OrdersDTO ordersDTO = ordersService.updateOrderStatus(id, request.getStatus(), request.getDescription());
+        return ResponseEntity.ok().body(ordersDTO);
+    }
+
+    /**
+     * {@code PUT  /orders/{id}/cancel} : Hủy đơn hàng.
+     *
+     * @param id ID đơn hàng
+     * @param request thông tin hủy đơn hàng
+     * @return the {@link ResponseEntity} with status {@code 200 (OK)} and with body the updated ordersDTO.
+     */
+    @PutMapping("/{id}/cancel")
+    public ResponseEntity<OrdersDTO> cancelOrder(
+        @PathVariable Long id,
+        @RequestBody(required = false) CancelOrderRequest request
+    ) {
+        LOG.debug("REST request to cancel order: {}", id);
+        String reason = request != null ? request.getReason() : null;
+        OrdersDTO ordersDTO = ordersService.cancelOrder(id, reason);
+        return ResponseEntity.ok().body(ordersDTO);
+    }
+
+    /**
+     * {@code PUT  /orders/{id}/confirm} : Xác nhận đơn hàng.
+     *
+     * @param id ID đơn hàng
+     * @return the {@link ResponseEntity} with status {@code 200 (OK)} and with body the updated ordersDTO.
+     */
+    @PutMapping("/{id}/confirm")
+    public ResponseEntity<OrdersDTO> confirmOrder(@PathVariable Long id) {
+        LOG.debug("REST request to confirm order: {}", id);
+        OrdersDTO ordersDTO = ordersService.confirmOrder(id);
+        return ResponseEntity.ok().body(ordersDTO);
+    }
+
+    /**
+     * {@code PUT  /orders/{id}/confirm-payment} : Xác nhận đã thanh toán cho đơn hàng.
+     *
+     * @param id ID đơn hàng
+     * @return the {@link ResponseEntity} with status {@code 200 (OK)} and with body the updated ordersDTO.
+     */
+    @PutMapping("/{id}/confirm-payment")
+    public ResponseEntity<OrdersDTO> confirmPayment(@PathVariable Long id) {
+        LOG.debug("REST request to confirm payment for order: {}", id);
+        OrdersDTO ordersDTO = ordersService.confirmPayment(id);
+        return ResponseEntity.ok()
+            .headers(HeaderUtil.createEntityUpdateAlert(applicationName, true, ENTITY_NAME, id.toString()))
+            .body(ordersDTO);
+    }
+
+    /**
+     * {@code GET  /orders/my-orders} : Lấy đơn hàng của khách hàng hiện tại.
+     *
+     * @param pageable thông tin phân trang
+     * @return the {@link ResponseEntity} with status {@code 200 (OK)} and the list of orders in body.
+     */
+    @GetMapping("/my-orders")
+    public ResponseEntity<List<OrdersDTO>> getMyOrders(
+        @org.springdoc.core.annotations.ParameterObject Pageable pageable
+    ) {
+        LOG.debug("REST request to get my orders");
+        Long userId = SecurityUtils.getCurrentUserId()
+            .orElseThrow(() -> new BadRequestAlertException("User not authenticated", ENTITY_NAME, "notauthenticated"));
+        
+        // Lấy customerId từ userId
+        Long customerId = customerRepository.findByUserId(userId)
+            .map(customer -> customer.getId())
+            .orElseThrow(() -> new BadRequestAlertException("Customer not found for user", ENTITY_NAME, "customernotfound"));
+        
+        Page<OrdersDTO> page = ordersService.getOrdersByCustomerId(customerId, pageable);
+        HttpHeaders headers = PaginationUtil.generatePaginationHttpHeaders(ServletUriComponentsBuilder.fromCurrentRequest(), page);
+        return ResponseEntity.ok().headers(headers).body(page.getContent());
+    }
+
+    /**
+     * {@code GET  /orders/code/{code}} : Lấy đơn hàng theo mã đơn hàng.
+     *
+     * @param code mã đơn hàng
+     * @return the {@link ResponseEntity} with status {@code 200 (OK)} and with body the ordersDTO, or with status {@code 404 (Not Found)}.
+     */
+    @GetMapping("/code/{code}")
+    public ResponseEntity<OrdersDTO> getOrderByCode(@PathVariable String code) {
+        LOG.debug("REST request to get Order by code: {}", code);
+        Optional<OrdersDTO> ordersDTO = ordersService.findByCode(code);
+        return ResponseUtil.wrapOrNotFound(ordersDTO);
+    }
+
+    /**
+     * {@code GET  /orders/{id}/status-history} : Lấy lịch sử trạng thái đơn hàng.
+     *
+     * @param id ID đơn hàng
+     * @return the {@link ResponseEntity} with status {@code 200 (OK)} and the list of status history in body.
+     */
+    @GetMapping("/{id}/status-history")
+    public ResponseEntity<List<OrderStatusHistoryDTO>> getOrderStatusHistory(@PathVariable Long id) {
+        LOG.debug("REST request to get order status history: {}", id);
+        List<OrderStatusHistoryDTO> histories = ordersService.getOrderStatusHistory(id);
+        return ResponseEntity.ok().body(histories);
+    }
+
+    /**
+     * {@code POST  /orders/{id}/reviews} : Tạo review cho toàn bộ đơn hàng.
+     * Tạo review cho từng sản phẩm trong order và bắn Kafka để tính điểm.
+     *
+     * @param id ID đơn hàng
+     * @param reviews danh sách review cho từng sản phẩm
+     * @return the {@link ResponseEntity} with status {@code 200 (OK)} and the list of created reviews in body.
+     */
+    @PostMapping("/{id}/reviews")
+    public ResponseEntity<List<com.lumiere.app.service.dto.ProductReviewDTO>> createReviewsForOrder(
+        @PathVariable Long id,
+        @Valid @RequestBody List<com.lumiere.app.service.dto.CreateOrderReviewDTO> reviews
+    ) {
+        LOG.debug("REST request to create reviews for order: {}", id);
+        List<com.lumiere.app.service.dto.ProductReviewDTO> createdReviews = ordersService.createReviewsForOrder(id, reviews);
+        return ResponseEntity.ok().body(createdReviews);
+    }
+
+    /**
+     * Request DTO cho tạo đơn hàng từ giỏ hàng.
+     */
+    public static class CreateOrderRequest {
+        private String paymentMethod;
+        private String note;
+        private Integer redeemedPoints;
+        private String voucherCode;
+
+        public String getPaymentMethod() {
+            return paymentMethod;
+        }
+
+        public void setPaymentMethod(String paymentMethod) {
+            this.paymentMethod = paymentMethod;
+        }
+
+        public String getNote() {
+            return note;
+        }
+
+        public void setNote(String note) {
+            this.note = note;
+        }
+
+        public Integer getRedeemedPoints() {
+            return redeemedPoints;
+        }
+
+        public void setRedeemedPoints(Integer redeemedPoints) {
+            this.redeemedPoints = redeemedPoints;
+        }
+
+        public String getVoucherCode() {
+            return voucherCode;
+        }
+
+        public void setVoucherCode(String voucherCode) {
+            this.voucherCode = voucherCode;
+        }
+    }
+
+    /**
+     * Request DTO cho cập nhật trạng thái đơn hàng.
+     */
+    public static class UpdateOrderStatusRequest {
+        @NotNull
+        private OrderStatus status;
+        private String description;
+
+        public OrderStatus getStatus() {
+            return status;
+        }
+
+        public void setStatus(OrderStatus status) {
+            this.status = status;
+        }
+
+        public String getDescription() {
+            return description;
+        }
+
+        public void setDescription(String description) {
+            this.description = description;
+        }
+    }
+
+    /**
+     * Request DTO cho hủy đơn hàng.
+     */
+    public static class CancelOrderRequest {
+        private String reason;
+
+        public String getReason() {
+            return reason;
+        }
+
+        public void setReason(String reason) {
+            this.reason = reason;
+        }
     }
 }

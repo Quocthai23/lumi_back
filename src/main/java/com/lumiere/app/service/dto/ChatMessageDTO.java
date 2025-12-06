@@ -28,6 +28,8 @@ public class ChatMessageDTO implements Serializable {
 
     private ChatSessionDTO session;
 
+    private Long contactMessageId;
+
     public Long getId() {
         return id;
     }
@@ -66,6 +68,14 @@ public class ChatMessageDTO implements Serializable {
 
     public void setSession(ChatSessionDTO session) {
         this.session = session;
+    }
+
+    public Long getContactMessageId() {
+        return contactMessageId;
+    }
+
+    public void setContactMessageId(Long contactMessageId) {
+        this.contactMessageId = contactMessageId;
     }
 
     @Override

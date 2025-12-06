@@ -7,6 +7,8 @@ import jakarta.validation.constraints.*;
 import java.io.Serializable;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 
 /**
@@ -42,7 +44,16 @@ public class OrdersDTO implements Serializable {
     @Min(value = 0)
     private Integer redeemedPoints;
 
+    @DecimalMin(value = "0")
+    private BigDecimal discountAmount;
+
     private CustomerDTO customer;
+
+    private VoucherDTO voucher;
+
+    private List<OrderItemDTO> orderItems = new ArrayList<>();
+
+    private Boolean canReview;
 
     public Long getId() {
         return id;
@@ -116,12 +127,44 @@ public class OrdersDTO implements Serializable {
         this.redeemedPoints = redeemedPoints;
     }
 
+    public BigDecimal getDiscountAmount() {
+        return discountAmount;
+    }
+
+    public void setDiscountAmount(BigDecimal discountAmount) {
+        this.discountAmount = discountAmount;
+    }
+
     public CustomerDTO getCustomer() {
         return customer;
     }
 
     public void setCustomer(CustomerDTO customer) {
         this.customer = customer;
+    }
+
+    public VoucherDTO getVoucher() {
+        return voucher;
+    }
+
+    public void setVoucher(VoucherDTO voucher) {
+        this.voucher = voucher;
+    }
+
+    public List<OrderItemDTO> getOrderItems() {
+        return orderItems;
+    }
+
+    public void setOrderItems(List<OrderItemDTO> orderItems) {
+        this.orderItems = orderItems;
+    }
+
+    public Boolean getCanReview() {
+        return canReview;
+    }
+
+    public void setCanReview(Boolean canReview) {
+        this.canReview = canReview;
     }
 
     @Override
@@ -158,7 +201,9 @@ public class OrdersDTO implements Serializable {
             ", paymentMethod='" + getPaymentMethod() + "'" +
             ", placedAt='" + getPlacedAt() + "'" +
             ", redeemedPoints=" + getRedeemedPoints() +
+            ", discountAmount=" + getDiscountAmount() +
             ", customer=" + getCustomer() +
+            ", voucher=" + getVoucher() +
             "}";
     }
 }
