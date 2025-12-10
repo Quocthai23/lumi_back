@@ -6,6 +6,8 @@ import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
 import java.io.Serializable;
 import java.time.Instant;
+
+import lombok.Data;
 import org.hibernate.annotations.Cache;
 import org.hibernate.annotations.CacheConcurrencyStrategy;
 
@@ -17,6 +19,7 @@ import org.hibernate.annotations.CacheConcurrencyStrategy;
 @Table(name = "chat_message")
 @Cache(usage = CacheConcurrencyStrategy.READ_WRITE)
 @SuppressWarnings("common-java:DuplicatedBlocks")
+@Data
 public class ChatMessage implements Serializable {
 
     private static final long serialVersionUID = 1L;
@@ -111,19 +114,6 @@ public class ChatMessage implements Serializable {
 
     public ChatMessage session(ChatSession chatSession) {
         this.setSession(chatSession);
-        return this;
-    }
-
-    public ContactMessage getContactMessage() {
-        return this.contactMessage;
-    }
-
-    public void setContactMessage(ContactMessage contactMessage) {
-        this.contactMessage = contactMessage;
-    }
-
-    public ChatMessage contactMessage(ContactMessage contactMessage) {
-        this.setContactMessage(contactMessage);
         return this;
     }
 

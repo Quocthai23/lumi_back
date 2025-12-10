@@ -49,12 +49,9 @@ public class WebConfigurer implements ServletContextInitializer {
             source.registerCorsConfiguration("/management/**", config);
             source.registerCorsConfiguration("/v3/api-docs", config);
             source.registerCorsConfiguration("/swagger-ui/**", config);
-            // Add CORS configuration for WebSocket endpoints
             source.registerCorsConfiguration("/ws/**", config);
             source.registerCorsConfiguration("/sockjs/**", config);
         } else {
-            // If CORS is not configured in properties, create a default config for WebSocket
-            // This allows WebSocket connections from any origin in development
             CorsConfiguration wsConfig = new CorsConfiguration();
             wsConfig.addAllowedOriginPattern("*");
             wsConfig.addAllowedMethod("*");

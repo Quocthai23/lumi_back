@@ -169,7 +169,7 @@ public class FlashSaleProductServiceImpl implements FlashSaleProductService {
         }
 
         // Lấy variant mặc định hoặc variant đầu tiên
-        List<ProductVariant> variants = productVariantRepository.findByProduct_Id(product.getId());
+        List<ProductVariant> variants = productVariantRepository.findByProductId(product.getId());
         if (variants.isEmpty()) {
             return BigDecimal.ZERO;
         }

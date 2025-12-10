@@ -17,14 +17,14 @@ public class OptionVariant implements Serializable {
 
     /** Biến thể sản phẩm */
     @NotNull
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.LAZY,cascade = CascadeType.ALL)
     @JoinColumn(name = "product_variant_id", nullable = false,
         foreignKey = @ForeignKey(name = "fk_option_variant_variant"))
     private ProductVariant productVariant;
 
     /** Lựa chọn thuộc tính đã chọn */
     @NotNull
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.LAZY,cascade = CascadeType.ALL)
     @JoinColumn(name = "option_select_id", nullable = false,
         foreignKey = @ForeignKey(name = "fk_option_variant_select"))
     private OptionSelect optionSelect;

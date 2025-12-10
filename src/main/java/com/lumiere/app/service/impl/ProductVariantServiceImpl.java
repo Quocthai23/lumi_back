@@ -90,7 +90,7 @@ public class ProductVariantServiceImpl implements ProductVariantService {
 
     @Override
     public List<ProductVariantDTO> findByProductId(Long productId){
-        return productVariantMapper.toDto(productVariantRepository.findByProduct_Id(productId));
+        return productVariantMapper.toDto(productVariantRepository.findByProductId(productId));
     }
 
     @Override

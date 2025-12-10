@@ -16,13 +16,11 @@ public class ProductAnswerDTO implements Serializable {
 
     private Long id;
 
-    @NotNull
     private String author;
 
     @Lob
     private String answerText;
 
-    @NotNull
     private Instant createdAt;
 
     private ProductQuestionDTO question;

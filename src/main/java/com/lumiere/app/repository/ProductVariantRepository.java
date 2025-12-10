@@ -30,20 +30,20 @@ public interface ProductVariantRepository extends JpaRepository<ProductVariant, 
     }
 
     @Query(
-        value = "select productVariant from ProductVariant productVariant left join fetch productVariant.product",
+        value = "select productVariant from ProductVariant productVariant",
         countQuery = "select count(productVariant) from ProductVariant productVariant"
     )
     Page<ProductVariant> findAllWithToOneRelationships(Pageable pageable);
 
-    @Query("select productVariant from ProductVariant productVariant left join fetch productVariant.product")
+    @Query("select productVariant from ProductVariant productVariant")
     List<ProductVariant> findAllWithToOneRelationships();
 
-    List<ProductVariant> findByProduct_Id(Long productId);
+    List<ProductVariant> findByProductId(Long productId);
 
-    @Query("select productVariant from ProductVariant productVariant left join fetch productVariant.product where productVariant.id =:id")
+    @Query("select productVariant from ProductVariant productVariant where productVariant.id =:id")
     Optional<ProductVariant> findOneWithToOneRelationships(@Param("id") Long id);
 
-    List<ProductVariant> findAllByProduct_Id(Long productId);
+    List<ProductVariant> findAllByProductId(Long productId);
     void deleteByIdIn(Collection<Long> ids);
 
     List<ProductVariant> findAllByIdIn(Collection<Long> ids);

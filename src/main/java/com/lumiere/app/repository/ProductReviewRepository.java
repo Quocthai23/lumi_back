@@ -51,4 +51,46 @@ public interface ProductReviewRepository extends JpaRepository<ProductReview, Lo
         @Param("productId") Long productId,
         @Param("status") com.lumiere.app.domain.enumeration.ReviewStatus status
     );
+
+    /**
+     * Tìm tất cả reviews của một sản phẩm, sắp xếp theo thời gian tạo (mới nhất trước).
+     *
+     * @param productId ID của sản phẩm
+     * @param pageable thông tin phân trang
+     * @return Page chứa danh sách reviews
+     */
+    @Query(
+        value = "select productReview from ProductReview productReview " +
+        "left join fetch productReview.product " +
+        "where productReview.product.id = :productId " +
+        "order by productReview.createdAt desc",
+        countQuery = "select count(productReview) from ProductReview productReview " +
+        "where productReview.product.id = :productId"
+    )
+    Page<ProductReview> findByProductIdOrderByCreatedAtDesc(
+        @Param("productId") Long productId,
+        Pageable pageable
+    );
+
+    /**
+     * Tìm tất cả reviews đã được approved của một sản phẩm, sắp xếp theo thời gian tạo (mới nhất trước).
+     *
+     * @param productId ID của sản phẩm
+     * @param pageable thông tin phân trang
+     * @return Page chứa danh sách reviews đã approved
+     */
+    @Query(
+        value = "select productReview from ProductReview productReview " +
+        "left join fetch productReview.product " +
+        "where productReview.product.id = :productId " +
+        "and productReview.status = 'APPROVED' " +
+        "order by productReview.createdAt desc",
+        countQuery = "select count(productReview) from ProductReview productReview " +
+        "where productReview.product.id = :productId " +
+        "and productReview.status = 'APPROVED'"
+    )
+    Page<ProductReview> findByProductIdAndApprovedOrderByCreatedAtDesc(
+        @Param("productId") Long productId,
+        Pageable pageable
+    );
 }

@@ -186,4 +186,31 @@ public class ProductReviewResource {
             .headers(HeaderUtil.createEntityDeletionAlert(applicationName, true, ENTITY_NAME, id.toString()))
             .build();
     }
+
+    /**
+     * {@code GET  /product-reviews/by-product/:productId} : get all the productReviews by productId.
+     *
+     * @param productId the id of the product.
+     * @param pageable the pagination information.
+     * @param approvedOnly if true, only return approved reviews (default: false).
+     * @return the {@link ResponseEntity} with status {@code 200 (OK)} and the list of productReviews in body.
+     */
+    @GetMapping("/by-product/{productId}")
+    public ResponseEntity<List<ProductReviewDTO>> getProductReviewsByProductId(
+        @PathVariable("productId") Long productId,
+        @org.springdoc.core.annotations.ParameterObject Pageable pageable,
+        @RequestParam(name = "approvedOnly", required = false, defaultValue = "false") boolean approvedOnly
+    ) {
+        LOG.debug("REST request to get ProductReviews by productId: {}, approvedOnly: {}", productId, approvedOnly);
+        
+        Page<ProductReviewDTO> page;
+        if (approvedOnly) {
+            page = productReviewService.findByProductIdAndApproved(productId, pageable);
+        } else {
+            page = productReviewService.findByProductId(productId, pageable);
+        }
+        
+        HttpHeaders headers = PaginationUtil.generatePaginationHttpHeaders(ServletUriComponentsBuilder.fromCurrentRequest(), page);
+        return ResponseEntity.ok().headers(headers).body(page.getContent());
+    }
 }

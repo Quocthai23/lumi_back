@@ -1,7 +1,9 @@
 // src/main/java/com/lumiere/app/service/impl/OptionSelectServiceImpl.java
 package com.lumiere.app.service.impl;
 
+import com.lumiere.app.domain.OptionGroup;
 import com.lumiere.app.domain.OptionSelect;
+import com.lumiere.app.repository.OptionGroupRepository;
 import com.lumiere.app.repository.OptionSelectRepository;
 import com.lumiere.app.service.OptionSelectService;
 import com.lumiere.app.service.dto.OptionSelectDTO;
@@ -19,6 +21,7 @@ import java.util.List;
 public class OptionSelectServiceImpl implements OptionSelectService {
 
   private final OptionSelectRepository repo;
+  private final OptionGroupRepository optionGroupRepo;
   private final OptionSelectMapper mapper;
 
   @Override
@@ -26,6 +29,10 @@ public class OptionSelectServiceImpl implements OptionSelectService {
     if (repo.existsByOptionGroup_IdAndCodeIgnoreCase(dto.getOptionGroupId(), dto.getCode()))
       throw new IllegalArgumentException("OptionSelect code duplicated in group");
     OptionSelect e = mapper.toEntity(dto);
+    // Load OptionGroup từ repository để đảm bảo entity tồn tại
+    OptionGroup group = optionGroupRepo.findById(dto.getOptionGroupId())
+        .orElseThrow(() -> new EntityNotFoundException("OptionGroup not found with id: " + dto.getOptionGroupId()));
+    e.setOptionGroup(group);
     return mapper.toDto(repo.save(e));
   }
 

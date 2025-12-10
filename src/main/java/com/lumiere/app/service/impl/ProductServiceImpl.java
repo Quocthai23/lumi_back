@@ -4,9 +4,11 @@ import com.lumiere.app.domain.Attachment;
 import com.lumiere.app.domain.Product;
 import com.lumiere.app.domain.ProductAttachment;
 import com.lumiere.app.domain.ProductAttachmentId;
+import com.lumiere.app.domain.ProductVariant;
 import com.lumiere.app.repository.AttachmentRepository;
 import com.lumiere.app.repository.ProductAttachmentRepository;
 import com.lumiere.app.repository.ProductRepository;
+import com.lumiere.app.repository.ProductVariantRepository;
 import com.lumiere.app.service.AttachmentService;
 import com.lumiere.app.service.ProductService;
 import com.lumiere.app.service.dto.AttachmentDTO;
@@ -47,14 +49,16 @@ public class ProductServiceImpl implements ProductService {
     private final AttachmentRepository attachmentRepository;
     private final ProductAttachmentRepository productAttachmentRepository;
     private final AttachmentMapper attachmentMapper;
+    private final ProductVariantRepository productVariantRepository;
 
-    public ProductServiceImpl(ProductRepository productRepository, ProductMapper productMapper, AttachmentService attachmentService, AttachmentRepository attachmentRepository, ProductAttachmentRepository productAttachmentRepository, AttachmentMapper attachmentMapper) {
+    public ProductServiceImpl(ProductRepository productRepository, ProductMapper productMapper, AttachmentService attachmentService, AttachmentRepository attachmentRepository, ProductAttachmentRepository productAttachmentRepository, AttachmentMapper attachmentMapper, ProductVariantRepository productVariantRepository) {
         this.productRepository = productRepository;
         this.productMapper = productMapper;
         this.attachmentService = attachmentService;
         this.attachmentRepository = attachmentRepository;
         this.productAttachmentRepository = productAttachmentRepository;
         this.attachmentMapper = attachmentMapper;
+        this.productVariantRepository = productVariantRepository;
     }
 
     @Override
@@ -288,5 +292,56 @@ public class ProductServiceImpl implements ProductService {
             .toList();
 
         return new PageImpl<>(dtos, pageable, idPage.getTotalElements());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Map<Long, String> getProductImagesMapByVariantId(Long productId) {
+        LOG.debug("Request to get product images map by variant ID for product : {}", productId);
+        
+        Map<Long, String> imageMap = new HashMap<>();
+        
+        // Lấy product
+        Optional<Product> productOpt = productRepository.findById(productId);
+        if (productOpt.isEmpty()) {
+            return imageMap;
+        }
+        
+        Product product = productOpt.get();
+        
+        // Thêm ảnh chung của product với key = 0L
+        if (product.getImages() != null && !product.getImages().trim().isEmpty()) {
+            String images = product.getImages();
+            // Nếu images là JSON array, lấy ảnh đầu tiên
+            if (images.startsWith("[")) {
+                try {
+                    // Parse JSON array đơn giản
+                    images = images.replace("[", "").replace("]", "")
+                                   .replace("\"", "").trim();
+                    if (!images.isEmpty()) {
+                        String firstImage = images.split(",")[0].trim();
+                        imageMap.put(0L, firstImage);
+                    }
+                } catch (Exception e) {
+                    LOG.warn("Failed to parse product images JSON", e);
+                }
+            } else {
+                // Nếu là string đơn giản hoặc comma-separated
+                String firstImage = images.split(",")[0].trim();
+                imageMap.put(0L, firstImage);
+            }
+        }
+        
+        // Lấy tất cả variants của product  
+        List<ProductVariant> variants = productVariantRepository.findByProductId(productId);
+        
+        // Thêm ảnh riêng của từng variant
+        for (ProductVariant variant : variants) {
+            if (variant.getUrlImage() != null && !variant.getUrlImage().trim().isEmpty()) {
+                imageMap.put(variant.getId(), variant.getUrlImage());
+            }
+        }
+        
+        return imageMap;
     }
 }

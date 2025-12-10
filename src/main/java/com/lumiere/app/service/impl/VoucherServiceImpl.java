@@ -255,4 +255,23 @@ public class VoucherServiceImpl implements VoucherService {
 
         return response;
     }
+
+    @Override
+    @Transactional
+    public void markVoucherAsUsed(Long voucherId, Long customerId) {
+        LOG.debug("Request to mark voucher {} as used by customer {}", voucherId, customerId);
+
+        // Tìm CustomerVoucher
+        CustomerVoucher customerVoucher = customerVoucherRepository
+            .findByCustomerIdAndVoucherId(customerId, voucherId)
+            .orElseThrow(() -> new IllegalArgumentException(
+                "Không tìm thấy voucher cho khách hàng này. Customer ID: " + customerId + ", Voucher ID: " + voucherId
+            ));
+
+        // Đánh dấu đã sử dụng
+        customerVoucher.setUsed(true);
+        customerVoucherRepository.save(customerVoucher);
+
+        LOG.info("Marked voucher {} as used by customer {}", voucherId, customerId);
+    }
 }

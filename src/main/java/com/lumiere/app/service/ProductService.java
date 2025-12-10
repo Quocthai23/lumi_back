@@ -7,6 +7,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -61,5 +62,15 @@ public interface ProductService {
         BigDecimal maxPrice,
         Pageable pageable
     );
+
+    /**
+     * Lấy tất cả ảnh của product và variants theo variant ID.
+     * Key = null hoặc 0L: ảnh chung của product
+     * Key = variantId: ảnh riêng của variant đó
+     *
+     * @param productId ID của product
+     * @return Map với key là variantId (hoặc null cho ảnh chung), value là URL ảnh
+     */
+    Map<Long, String> getProductImagesMapByVariantId(Long productId);
 
 }

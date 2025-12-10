@@ -8,6 +8,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -61,6 +62,7 @@ public class ProductQuestionResource {
         if (productQuestionDTO.getId() != null) {
             throw new BadRequestAlertException("A new productQuestion cannot already have an ID", ENTITY_NAME, "idexists");
         }
+        productQuestionDTO.setCreatedAt(Instant.now());
         productQuestionDTO = productQuestionService.save(productQuestionDTO);
         return ResponseEntity.created(new URI("/api/product-questions/" + productQuestionDTO.getId()))
             .headers(HeaderUtil.createEntityCreationAlert(applicationName, true, ENTITY_NAME, productQuestionDTO.getId().toString()))

@@ -26,25 +26,25 @@ public class ProductVariant implements Serializable {
     @Column(name = "id")
     private Long id;
 
-    @Column(name = "sku", length = 64, nullable = false, unique = true)
+    @Column(name = "sku")
     private String sku;
 
-    @Column(name = "name", length = 255, nullable = false)
+    @Column(name = "name")
     private String name;
 
-    @Column(name = "price", precision = 21, scale = 2, nullable = false)
+    @Column(name = "price")
     private BigDecimal price;
 
-    @Column(name = "compare_at_price", precision = 21, scale = 2)
+    @Column(name = "compare_at_price")
     private BigDecimal compareAtPrice;
 
-    @Column(name = "currency", length = 3)
+    @Column(name = "currency")
     private String currency;
 
-    @Column(name = "stock_quantity", nullable = false)
+    @Column(name = "stock_quantity")
     private Long stockQuantity;
 
-    @Column(name = "is_default", nullable = false)
+    @Column(name = "is_default")
     private Boolean isDefault;
 
     @Column(name = "color")
@@ -57,7 +57,7 @@ public class ProductVariant implements Serializable {
     @JsonIgnoreProperties(value = { "variants", "reviews", "questions", "collections", "wishlistedBies" }, allowSetters = true)
     private Product product;
 
-    @Column(name = "url_image", length = 1000, nullable = false)
+    @Column(name = "url_image")
     private String urlImage;
 
     public Boolean getDefault() {

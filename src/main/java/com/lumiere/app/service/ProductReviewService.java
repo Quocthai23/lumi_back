@@ -63,4 +63,22 @@ public interface ProductReviewService {
      * @param id the id of the entity.
      */
     void delete(Long id);
+
+    /**
+     * Tìm tất cả reviews của một sản phẩm.
+     *
+     * @param productId ID của sản phẩm
+     * @param pageable thông tin phân trang
+     * @return Page chứa danh sách reviews
+     */
+    Page<ProductReviewDTO> findByProductId(Long productId, Pageable pageable);
+
+    /**
+     * Tìm tất cả reviews đã được approved của một sản phẩm.
+     *
+     * @param productId ID của sản phẩm
+     * @param pageable thông tin phân trang
+     * @return Page chứa danh sách reviews đã approved
+     */
+    Page<ProductReviewDTO> findByProductIdAndApproved(Long productId, Pageable pageable);
 }

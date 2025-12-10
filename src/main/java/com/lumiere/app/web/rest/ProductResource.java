@@ -14,6 +14,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import org.slf4j.Logger;
@@ -232,5 +233,18 @@ public class ProductResource {
 
         return ResponseEntity.ok()
             .body(page);
+    }
+
+    /**
+     * {@code GET  /products/:id/images-map} : Lấy map ảnh của product và các variants theo variant ID.
+     *
+     * @param id ID của product
+     * @return Map với key là variantId (0L cho ảnh chung của product), value là URL ảnh
+     */
+    @GetMapping("/{id}/images-map")
+    public ResponseEntity<Map<Long, String>> getProductImagesMap(@PathVariable("id") Long id) {
+        LOG.debug("REST request to get product images map for product : {}", id);
+        Map<Long, String> imageMap = productService.getProductImagesMapByVariantId(id);
+        return ResponseEntity.ok().body(imageMap);
     }
 }

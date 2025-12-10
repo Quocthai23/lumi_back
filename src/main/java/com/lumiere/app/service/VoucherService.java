@@ -101,4 +101,13 @@ public interface VoucherService {
      * @throws IllegalArgumentException nếu voucher không hợp lệ hoặc khách hàng không có quyền sử dụng
      */
     VoucherCalculateResponseDTO calculateDiscount(VoucherCalculateRequestDTO request, Long customerId);
+
+    /**
+     * Đánh dấu voucher đã được sử dụng bởi khách hàng.
+     *
+     * @param voucherId ID của voucher
+     * @param customerId ID của khách hàng
+     * @throws IllegalArgumentException nếu không tìm thấy customer voucher
+     */
+    void markVoucherAsUsed(Long voucherId, Long customerId);
 }

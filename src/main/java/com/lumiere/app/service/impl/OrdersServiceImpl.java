@@ -27,7 +27,9 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+import com.lumiere.app.service.mapper.ProductMapper;
 import com.lumiere.app.service.mapper.ProductVariantMapper;
+import com.lumiere.app.utils.RatingUtils;
 import jakarta.servlet.ServletOutputStream;
 import jakarta.servlet.http.HttpServletResponse;
 import org.apache.poi.ss.usermodel.*;
@@ -71,6 +73,8 @@ public class OrdersServiceImpl implements OrdersService {
     private final ProductVariantMapper productVariantMapper;
     private final KafkaTemplate<String, Object> kafkaTemplate;
     private final InventoryRepository inventoryRepository;
+    private final ProductMapper productMapper;
+    private final ProductService productService;
 
     public OrdersServiceImpl(
         OrdersRepository ordersRepository,
@@ -91,7 +95,7 @@ public class OrdersServiceImpl implements OrdersService {
         VoucherService voucherService,
         ProductVariantMapper productVariantMapper,
         KafkaTemplate<String, Object> kafkaTemplate,
-        InventoryRepository inventoryRepository) {
+        InventoryRepository inventoryRepository, ProductMapper productMapper, ProductService productService) {
         this.ordersRepository = ordersRepository;
         this.ordersMapper = ordersMapper;
         this.customerService = customerService;
@@ -111,6 +115,8 @@ public class OrdersServiceImpl implements OrdersService {
         this.productVariantMapper = productVariantMapper;
         this.kafkaTemplate = kafkaTemplate;
         this.inventoryRepository = inventoryRepository;
+        this.productMapper = productMapper;
+        this.productService = productService;
     }
 
     @Override
@@ -364,7 +370,7 @@ public class OrdersServiceImpl implements OrdersService {
 
             // Lấy inventory với pessimistic lock để đảm bảo atomic
             List<Inventory> inventories = inventoryRepository.findByProductVariantIdForUpdate(variant.getId());
-            
+
             if (inventories.isEmpty()) {
                 throw new IllegalArgumentException(
                     "Sản phẩm " + variant.getSku() + " không có trong kho. Vui lòng kiểm tra lại."
@@ -398,7 +404,7 @@ public class OrdersServiceImpl implements OrdersService {
                         // Nếu không cập nhật được (có thể do race condition), thử lại với inventory mới
                         Inventory refreshedInventory = inventoryRepository.findById(inventory.getId())
                             .orElseThrow(() -> new IllegalArgumentException("Inventory not found: " + inventory.getId()));
-                        
+
                         if (refreshedInventory.getStockQuantity() < deductAmount) {
                             // Không đủ hàng, rollback transaction sẽ được xử lý tự động
                             throw new IllegalArgumentException(
@@ -555,6 +561,8 @@ public class OrdersServiceImpl implements OrdersService {
         // Áp dụng voucher (tăng usage count) sau khi đơn hàng được tạo thành công
         if (voucher != null) {
             voucherService.applyVoucher(voucher);
+            // Đánh dấu voucher đã được sử dụng bởi khách hàng
+            voucherService.markVoucherAsUsed(voucher.getId(), customer.getId());
         }
 
         // Tạo OrderItems từ CartItems
@@ -989,37 +997,27 @@ public class OrdersServiceImpl implements OrdersService {
      * Cập nhật average rating và review count của product.
      */
     private void updateProductRating(Product product) {
+        ProductDTO productDTO = productMapper.toDto(product);
         List<ProductReview> approvedReviews = productReviewRepository.findAll().stream()
             .filter(review ->
                 review.getProduct() != null &&
-                review.getProduct().getId().equals(product.getId()) &&
-                review.getStatus() == ReviewStatus.APPROVED
+                review.getProduct().getId().equals(product.getId())
             )
             .collect(Collectors.toList());
 
         if (approvedReviews.isEmpty()) {
-            product.setAverageRating(0.0);
-            product.setReviewCount(0);
+            productDTO.setAverageRating(0.0);
+            productDTO.setReviewCount(0);
         } else {
             double totalRating = approvedReviews.stream()
-                .mapToDouble(review -> {
-                    RatingType rating = review.getRating();
-                    switch (rating) {
-                        case ONE: return 1.0;
-                        case TWO: return 2.0;
-                        case THREE: return 3.0;
-                        case FOUR: return 4.0;
-                        case FIVE: return 5.0;
-                        default: return 0.0;
-                    }
-                })
+                .mapToDouble(review -> RatingUtils.toNumber(review.getRating()))
                 .sum();
 
-            product.setAverageRating(totalRating / approvedReviews.size());
-            product.setReviewCount(approvedReviews.size());
+            productDTO.setAverageRating(totalRating / approvedReviews.size());
+            productDTO.setReviewCount(approvedReviews.size());
         }
 
-        productRepository.save(product);
+        productService.save(productDTO);
     }
 
     /**
@@ -1196,7 +1194,6 @@ public class OrdersServiceImpl implements OrdersService {
                     customer.getId(),
                     orderId
                 );
-                kafkaTemplate.send("review-rating", message);
                 LOG.info("Sent Kafka message for review rating: {}", message);
             } catch (Exception e) {
                 LOG.error("Failed to send Kafka message for review rating", e);
