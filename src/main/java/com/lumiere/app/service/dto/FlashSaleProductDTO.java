@@ -27,7 +27,7 @@ public class FlashSaleProductDTO implements Serializable {
 
     private FlashSaleDTO flashSale;
 
-    private ProductDTO product;
+    private ProductVariantDTO productVariant;
 
     public Long getId() {
         return id;
@@ -69,12 +69,12 @@ public class FlashSaleProductDTO implements Serializable {
         this.flashSale = flashSale;
     }
 
-    public ProductDTO getProduct() {
-        return product;
+    public ProductVariantDTO getProductVariant() {
+        return productVariant;
     }
 
-    public void setProduct(ProductDTO product) {
-        this.product = product;
+    public void setProductVariant(ProductVariantDTO productVariant) {
+        this.productVariant = productVariant;
     }
 
     @Override
@@ -107,7 +107,7 @@ public class FlashSaleProductDTO implements Serializable {
             ", quantity=" + getQuantity() +
             ", sold=" + getSold() +
             ", flashSale=" + getFlashSale() +
-            ", product=" + getProduct() +
+            ", productVariant=" + getProductVariant() +
             "}";
     }
 }

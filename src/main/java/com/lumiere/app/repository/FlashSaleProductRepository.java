@@ -27,18 +27,18 @@ public interface FlashSaleProductRepository extends JpaRepository<FlashSaleProdu
     }
 
     @Query(
-        value = "select flashSaleProduct from FlashSaleProduct flashSaleProduct left join fetch flashSaleProduct.flashSale left join fetch flashSaleProduct.product",
+        value = "select flashSaleProduct from FlashSaleProduct flashSaleProduct left join fetch flashSaleProduct.flashSale left join fetch flashSaleProduct.productVariant",
         countQuery = "select count(flashSaleProduct) from FlashSaleProduct flashSaleProduct"
     )
     Page<FlashSaleProduct> findAllWithToOneRelationships(Pageable pageable);
 
     @Query(
-        "select flashSaleProduct from FlashSaleProduct flashSaleProduct left join fetch flashSaleProduct.flashSale left join fetch flashSaleProduct.product"
+        "select flashSaleProduct from FlashSaleProduct flashSaleProduct left join fetch flashSaleProduct.flashSale left join fetch flashSaleProduct.productVariant"
     )
     List<FlashSaleProduct> findAllWithToOneRelationships();
 
     @Query(
-        "select flashSaleProduct from FlashSaleProduct flashSaleProduct left join fetch flashSaleProduct.flashSale left join fetch flashSaleProduct.product where flashSaleProduct.id =:id"
+        "select flashSaleProduct from FlashSaleProduct flashSaleProduct left join fetch flashSaleProduct.flashSale left join fetch flashSaleProduct.productVariant where flashSaleProduct.id =:id"
     )
     Optional<FlashSaleProduct> findOneWithToOneRelationships(@Param("id") Long id);
 
@@ -46,26 +46,45 @@ public interface FlashSaleProductRepository extends JpaRepository<FlashSaleProdu
      * Tìm tất cả flash sale products theo flash sale id
      */
     @Query(
-        "select flashSaleProduct from FlashSaleProduct flashSaleProduct left join fetch flashSaleProduct.flashSale left join fetch flashSaleProduct.product where flashSaleProduct.flashSale.id = :flashSaleId"
+        "select flashSaleProduct from FlashSaleProduct flashSaleProduct left join fetch flashSaleProduct.flashSale left join fetch flashSaleProduct.productVariant where flashSaleProduct.flashSale.id = :flashSaleId"
     )
     List<FlashSaleProduct> findByFlashSaleId(@Param("flashSaleId") Long flashSaleId);
 
     /**
-     * Tìm flash sale product theo product id và flash sale đang active
+     * Tìm flash sale product theo product variant id và flash sale đang active
      */
     @Query(
-        "select flashSaleProduct from FlashSaleProduct flashSaleProduct left join fetch flashSaleProduct.flashSale left join fetch flashSaleProduct.product " +
-        "where flashSaleProduct.product.id = :productId " +
+        "select flashSaleProduct from FlashSaleProduct flashSaleProduct left join fetch flashSaleProduct.flashSale left join fetch flashSaleProduct.productVariant " +
+        "where flashSaleProduct.productVariant.id = :productVariantId " +
+        "and flashSaleProduct.flashSale.startTime <= :now " +
+        "and flashSaleProduct.flashSale.endTime >= :now"
+    )
+    Optional<FlashSaleProduct> findActiveByProductVariantId(@Param("productVariantId") Long productVariantId, @Param("now") java.time.Instant now);
+
+    /**
+     * Tìm flash sale product theo product id và flash sale đang active (tìm qua product variant)
+     */
+    @Query(
+        "select flashSaleProduct from FlashSaleProduct flashSaleProduct left join fetch flashSaleProduct.flashSale left join fetch flashSaleProduct.productVariant " +
+        "where flashSaleProduct.productVariant.product.id = :productId " +
         "and flashSaleProduct.flashSale.startTime <= :now " +
         "and flashSaleProduct.flashSale.endTime >= :now"
     )
     Optional<FlashSaleProduct> findActiveByProductId(@Param("productId") Long productId, @Param("now") java.time.Instant now);
 
     /**
-     * Tìm tất cả flash sale products theo product id
+     * Tìm tất cả flash sale products theo product variant id
      */
     @Query(
-        "select flashSaleProduct from FlashSaleProduct flashSaleProduct left join fetch flashSaleProduct.flashSale left join fetch flashSaleProduct.product where flashSaleProduct.product.id = :productId"
+        "select flashSaleProduct from FlashSaleProduct flashSaleProduct left join fetch flashSaleProduct.flashSale left join fetch flashSaleProduct.productVariant where flashSaleProduct.productVariant.id = :productVariantId"
+    )
+    List<FlashSaleProduct> findByProductVariantId(@Param("productVariantId") Long productVariantId);
+
+    /**
+     * Tìm tất cả flash sale products theo product id (tìm qua product variant)
+     */
+    @Query(
+        "select flashSaleProduct from FlashSaleProduct flashSaleProduct left join fetch flashSaleProduct.flashSale left join fetch flashSaleProduct.productVariant where flashSaleProduct.productVariant.product.id = :productId"
     )
     List<FlashSaleProduct> findByProductId(@Param("productId") Long productId);
 
@@ -73,7 +92,7 @@ public interface FlashSaleProductRepository extends JpaRepository<FlashSaleProdu
      * Tìm các flash sale products còn hàng (quantity > sold)
      */
     @Query(
-        "select flashSaleProduct from FlashSaleProduct flashSaleProduct left join fetch flashSaleProduct.flashSale left join fetch flashSaleProduct.product " +
+        "select flashSaleProduct from FlashSaleProduct flashSaleProduct left join fetch flashSaleProduct.flashSale left join fetch flashSaleProduct.productVariant " +
         "where flashSaleProduct.quantity > flashSaleProduct.sold"
     )
     List<FlashSaleProduct> findAvailableProducts();

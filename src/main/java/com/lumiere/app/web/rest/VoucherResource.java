@@ -3,7 +3,9 @@ package com.lumiere.app.web.rest;
 import com.lumiere.app.repository.CustomerRepository;
 import com.lumiere.app.repository.VoucherRepository;
 import com.lumiere.app.security.SecurityUtils;
+import com.lumiere.app.service.CustomerVoucherService;
 import com.lumiere.app.service.VoucherService;
+import com.lumiere.app.service.dto.CustomerVoucherDTO;
 import com.lumiere.app.service.dto.VoucherCalculateRequestDTO;
 import com.lumiere.app.service.dto.VoucherCalculateResponseDTO;
 import com.lumiere.app.service.dto.VoucherDTO;
@@ -18,9 +20,14 @@ import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 import tech.jhipster.web.util.HeaderUtil;
+import tech.jhipster.web.util.PaginationUtil;
 import tech.jhipster.web.util.ResponseUtil;
 
 /**
@@ -43,14 +50,18 @@ public class VoucherResource {
 
     private final CustomerRepository customerRepository;
 
+    private final CustomerVoucherService customerVoucherService;
+
     public VoucherResource(
         VoucherService voucherService,
         VoucherRepository voucherRepository,
-        CustomerRepository customerRepository
+        CustomerRepository customerRepository,
+        CustomerVoucherService customerVoucherService
     ) {
         this.voucherService = voucherService;
         this.voucherRepository = voucherRepository;
         this.customerRepository = customerRepository;
+        this.customerVoucherService = customerVoucherService;
     }
 
     /**
@@ -144,12 +155,26 @@ public class VoucherResource {
     /**
      * {@code GET  /vouchers} : get all the vouchers.
      *
+     * @param pageable the pagination information.
+     * @param availableOnly if true, only return available vouchers (ACTIVE and not expired).
      * @return the {@link ResponseEntity} with status {@code 200 (OK)} and the list of vouchers in body.
      */
     @GetMapping("")
-    public List<VoucherDTO> getAllVouchers() {
-        LOG.debug("REST request to get all Vouchers");
-        return voucherService.findAll();
+    public ResponseEntity<List<VoucherDTO>> getAllVouchers(
+        @org.springdoc.core.annotations.ParameterObject Pageable pageable,
+        @RequestParam(name = "availableOnly", required = false, defaultValue = "false") boolean availableOnly
+    ) {
+        LOG.debug("REST request to get Vouchers with pagination, availableOnly: {}", availableOnly);
+        
+        if (availableOnly) {
+            Page<VoucherDTO> page = voucherService.findAllAvailable(pageable);
+            HttpHeaders headers = PaginationUtil.generatePaginationHttpHeaders(ServletUriComponentsBuilder.fromCurrentRequest(), page);
+            return ResponseEntity.ok().headers(headers).body(page.getContent());
+        } else {
+            // For admin, return all vouchers without pagination (backward compatibility)
+            List<VoucherDTO> vouchers = voucherService.findAll();
+            return ResponseEntity.ok().body(vouchers);
+        }
     }
 
     /**
@@ -215,6 +240,34 @@ public class VoucherResource {
             return ResponseEntity.ok().body(response);
         } catch (IllegalArgumentException e) {
             throw new BadRequestAlertException(e.getMessage(), ENTITY_NAME, "voucherinvalid");
+        }
+    }
+
+    /**
+     * {@code POST  /vouchers/:id/claim} : Claim (lấy) một voucher cho khách hàng hiện tại.
+     *
+     * @param id the id of the voucher to claim.
+     * @return the {@link ResponseEntity} with status {@code 200 (OK)} and with body the CustomerVoucherDTO,
+     * or with status {@code 400 (Bad Request)} if the request is invalid.
+     */
+    @PostMapping("/{id}/claim")
+    public ResponseEntity<CustomerVoucherDTO> claimVoucher(@PathVariable("id") Long id) {
+        LOG.debug("REST request to claim Voucher : {}", id);
+
+        // Lấy userId từ user hiện tại
+        Long userId = SecurityUtils
+            .getCurrentUserId()
+            .orElseThrow(() -> new BadRequestAlertException(
+                "Không tìm thấy thông tin người dùng. Vui lòng đăng nhập lại.",
+                ENTITY_NAME,
+                "usernotfound"
+            ));
+
+        try {
+            CustomerVoucherDTO customerVoucherDTO = customerVoucherService.claimVoucher(userId, id);
+            return ResponseEntity.ok().body(customerVoucherDTO);
+        } catch (IllegalArgumentException e) {
+            throw new BadRequestAlertException(e.getMessage(), ENTITY_NAME, "voucherclaimfailed");
         }
     }
 }

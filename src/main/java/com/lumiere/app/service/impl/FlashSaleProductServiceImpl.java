@@ -1,12 +1,10 @@
 package com.lumiere.app.service.impl;
 
 import com.lumiere.app.domain.FlashSaleProduct;
-import com.lumiere.app.domain.Product;
 import com.lumiere.app.domain.ProductVariant;
 import com.lumiere.app.domain.User;
 import com.lumiere.app.repository.FlashSaleProductRepository;
 import com.lumiere.app.repository.FlashSaleRepository;
-import com.lumiere.app.repository.ProductRepository;
 import com.lumiere.app.repository.ProductVariantRepository;
 import com.lumiere.app.repository.UserRepository;
 import com.lumiere.app.service.FlashSaleProductService;
@@ -44,8 +42,6 @@ public class FlashSaleProductServiceImpl implements FlashSaleProductService {
 
     private final FlashSaleRepository flashSaleRepository;
 
-    private final ProductRepository productRepository;
-
     private final ProductVariantRepository productVariantRepository;
 
     public FlashSaleProductServiceImpl(
@@ -54,7 +50,6 @@ public class FlashSaleProductServiceImpl implements FlashSaleProductService {
         MailService mailService,
         UserRepository userRepository,
         FlashSaleRepository flashSaleRepository,
-        ProductRepository productRepository,
         ProductVariantRepository productVariantRepository
     ) {
         this.flashSaleProductRepository = flashSaleProductRepository;
@@ -62,7 +57,6 @@ public class FlashSaleProductServiceImpl implements FlashSaleProductService {
         this.mailService = mailService;
         this.userRepository = userRepository;
         this.flashSaleRepository = flashSaleRepository;
-        this.productRepository = productRepository;
         this.productVariantRepository = productVariantRepository;
     }
 
@@ -104,36 +98,41 @@ public class FlashSaleProductServiceImpl implements FlashSaleProductService {
             throw new IllegalArgumentException("Số lượng đã bán không được vượt quá số lượng tổng");
         }
 
-        // Kiểm tra flash sale và product tồn tại
+        // Kiểm tra flash sale và product variant tồn tại
         if (flashSaleProductDTO.getFlashSale() == null || flashSaleProductDTO.getFlashSale().getId() == null) {
             throw new IllegalArgumentException("Flash sale không được để trống");
         }
 
-        if (flashSaleProductDTO.getProduct() == null || flashSaleProductDTO.getProduct().getId() == null) {
-            throw new IllegalArgumentException("Sản phẩm không được để trống");
+        if (flashSaleProductDTO.getProductVariant() == null || flashSaleProductDTO.getProductVariant().getId() == null) {
+            throw new IllegalArgumentException("Biến thể sản phẩm không được để trống");
         }
 
         flashSaleRepository
             .findById(flashSaleProductDTO.getFlashSale().getId())
             .orElseThrow(() -> new IllegalArgumentException("Flash sale không tồn tại"));
 
-        productRepository
-            .findById(flashSaleProductDTO.getProduct().getId())
-            .orElseThrow(() -> new IllegalArgumentException("Sản phẩm không tồn tại"));
+        productVariantRepository
+            .findById(flashSaleProductDTO.getProductVariant().getId())
+            .orElseThrow(() -> new IllegalArgumentException("Biến thể sản phẩm không tồn tại"));
     }
 
     private void sendFlashSaleNotificationEmails(FlashSaleProduct flashSaleProduct) {
         try {
-            // Lấy thông tin flash sale và product
+            // Lấy thông tin flash sale và product variant
             String flashSaleName = flashSaleProduct.getFlashSale() != null ? flashSaleProduct.getFlashSale().getName() : "Flash Sale";
-            String productName = flashSaleProduct.getProduct() != null ? flashSaleProduct.getProduct().getName() : "Sản phẩm";
+            ProductVariant productVariant = flashSaleProduct.getProductVariant();
+            String productName = productVariant != null && productVariant.getProduct() != null 
+                ? productVariant.getProduct().getName() 
+                : "Sản phẩm";
             BigDecimal salePrice = flashSaleProduct.getSalePrice();
 
-            // Lấy giá gốc từ product variant (lấy variant đầu tiên hoặc variant mặc định)
-            BigDecimal originalPrice = getOriginalPrice(flashSaleProduct.getProduct());
+            // Lấy giá gốc từ product variant
+            BigDecimal originalPrice = productVariant != null && productVariant.getPrice() != null 
+                ? productVariant.getPrice() 
+                : BigDecimal.ZERO;
 
             // Tạo URL sản phẩm
-            String productUrl = buildProductUrl(flashSaleProduct.getProduct());
+            String productUrl = buildProductUrl(productVariant);
 
             // Lấy danh sách tất cả người dùng đã kích hoạt để gửi email
             List<User> activatedUsers = userRepository.findAllByIdNotNullAndActivatedIsTrue(Pageable.unpaged()).getContent();
@@ -163,34 +162,13 @@ public class FlashSaleProductServiceImpl implements FlashSaleProductService {
         }
     }
 
-    private BigDecimal getOriginalPrice(Product product) {
-        if (product == null) {
-            return BigDecimal.ZERO;
-        }
-
-        // Lấy variant mặc định hoặc variant đầu tiên
-        List<ProductVariant> variants = productVariantRepository.findByProductId(product.getId());
-        if (variants.isEmpty()) {
-            return BigDecimal.ZERO;
-        }
-
-        // Tìm variant mặc định
-        Optional<ProductVariant> defaultVariant = variants.stream().filter(ProductVariant::getDefault).findFirst();
-        if (defaultVariant.isPresent()) {
-            return defaultVariant.get().getPrice();
-        }
-
-        // Nếu không có variant mặc định, lấy variant đầu tiên
-        return variants.get(0).getPrice();
-    }
-
-    private String buildProductUrl(Product product) {
-        if (product == null || product.getSlug() == null) {
+    private String buildProductUrl(ProductVariant productVariant) {
+        if (productVariant == null || productVariant.getProduct() == null || productVariant.getProduct().getSlug() == null) {
             return "";
         }
         // Giả sử base URL được lấy từ MailService hoặc config
         // Ở đây tạm thời trả về slug, sẽ được xử lý trong email template
-        return "/products/" + product.getSlug();
+        return "/products/" + productVariant.getProduct().getSlug();
     }
 
     @Override
@@ -258,10 +236,29 @@ public class FlashSaleProductServiceImpl implements FlashSaleProductService {
 
     @Override
     @Transactional(readOnly = true)
+    public Optional<FlashSaleProductDTO> findActiveByProductVariantId(Long productVariantId) {
+        LOG.debug("Request to get active FlashSaleProduct by productVariantId : {}", productVariantId);
+        java.time.Instant now = java.time.Instant.now();
+        return flashSaleProductRepository.findActiveByProductVariantId(productVariantId, now).map(flashSaleProductMapper::toDto);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public Optional<FlashSaleProductDTO> findActiveByProductId(Long productId) {
         LOG.debug("Request to get active FlashSaleProduct by productId : {}", productId);
         java.time.Instant now = java.time.Instant.now();
         return flashSaleProductRepository.findActiveByProductId(productId, now).map(flashSaleProductMapper::toDto);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<FlashSaleProductDTO> findByProductVariantId(Long productVariantId) {
+        LOG.debug("Request to get FlashSaleProducts by productVariantId : {}", productVariantId);
+        return flashSaleProductRepository
+            .findByProductVariantId(productVariantId)
+            .stream()
+            .map(flashSaleProductMapper::toDto)
+            .collect(Collectors.toList());
     }
 
     @Override

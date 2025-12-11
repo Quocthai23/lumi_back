@@ -3,6 +3,7 @@ package com.lumiere.app.service.impl;
 import com.lumiere.app.domain.*;
 import com.lumiere.app.domain.enumeration.CustomerTier;
 import com.lumiere.app.domain.enumeration.LoyaltyTransactionType;
+import com.lumiere.app.domain.enumeration.NotificationType;
 import com.lumiere.app.domain.enumeration.OrderStatus;
 import com.lumiere.app.domain.enumeration.PaymentStatus;
 import com.lumiere.app.domain.enumeration.RatingType;
@@ -11,6 +12,7 @@ import com.lumiere.app.repository.*;
 import com.lumiere.app.security.SecurityUtils;
 import com.lumiere.app.service.*;
 import com.lumiere.app.service.dto.*;
+import com.lumiere.app.service.kafka.NotificationProducerService;
 import com.lumiere.app.service.mapper.OrderStatusHistoryMapper;
 import com.lumiere.app.service.mapper.OrdersMapper;
 
@@ -75,6 +77,7 @@ public class OrdersServiceImpl implements OrdersService {
     private final InventoryRepository inventoryRepository;
     private final ProductMapper productMapper;
     private final ProductService productService;
+    private final NotificationProducerService notificationProducerService;
 
     public OrdersServiceImpl(
         OrdersRepository ordersRepository,
@@ -95,7 +98,8 @@ public class OrdersServiceImpl implements OrdersService {
         VoucherService voucherService,
         ProductVariantMapper productVariantMapper,
         KafkaTemplate<String, Object> kafkaTemplate,
-        InventoryRepository inventoryRepository, ProductMapper productMapper, ProductService productService) {
+        InventoryRepository inventoryRepository, ProductMapper productMapper, ProductService productService,
+        NotificationProducerService notificationProducerService) {
         this.ordersRepository = ordersRepository;
         this.ordersMapper = ordersMapper;
         this.customerService = customerService;
@@ -117,6 +121,7 @@ public class OrdersServiceImpl implements OrdersService {
         this.inventoryRepository = inventoryRepository;
         this.productMapper = productMapper;
         this.productService = productService;
+        this.notificationProducerService = notificationProducerService;
     }
 
     @Override
@@ -346,7 +351,7 @@ public class OrdersServiceImpl implements OrdersService {
 
     @Override
     @Transactional
-    public OrdersDTO createOrderFromCart(String paymentMethod, String note, Integer redeemedPoints, String voucherCode) {
+    public OrdersDTO createOrderFromCart(String paymentMethod, String note, Integer redeemedPoints, String voucherCode, BigDecimal shippingCost, String shippingInfo) {
         // Lấy userId từ SecurityContext
         Long userId = SecurityUtils.getCurrentUserId()
             .orElseThrow(() -> new IllegalArgumentException("User not authenticated"));
@@ -553,6 +558,8 @@ public class OrdersServiceImpl implements OrdersService {
         order.setPlacedAt(Instant.now());
         order.setRedeemedPoints(redeemedPoints != null ? redeemedPoints : 0);
         order.setDiscountAmount(discountAmount);
+        order.setShippingCost(shippingCost != null ? shippingCost : BigDecimal.ZERO);
+        order.setShippingInfo(shippingInfo);
         order.setVoucher(voucher);
         order.setCustomer(customer);
 
@@ -586,6 +593,18 @@ public class OrdersServiceImpl implements OrdersService {
         // Tạo lịch sử trạng thái
         createOrderStatusHistory(order, OrderStatus.PENDING, "Đơn hàng được tạo từ giỏ hàng");
 
+        // Gửi notification cho admin về đơn hàng mới
+        String customerName = (customer.getFirstName() != null ? customer.getFirstName() : "") + 
+                             (customer.getLastName() != null ? " " + customer.getLastName() : "");
+        customerName = customerName.trim().isEmpty() ? "Khách hàng #" + customer.getId() : customerName;
+        String adminMessage = String.format("Có đơn hàng mới #%s từ %s với tổng tiền %s VND", 
+            orderCode, customerName, totalAmount);
+        notificationProducerService.sendAdminNotification(
+            NotificationType.NEW_ORDER,
+            adminMessage,
+            "/admin/orders/" + order.getId()
+        );
+
         OrdersDTO dto = ordersMapper.toDto(order);
         setCanReview(dto, order);
         return dto;
@@ -612,9 +631,47 @@ public class OrdersServiceImpl implements OrdersService {
         }
 
         order = ordersRepository.save(order);
+
+        // Gửi notification cho customer về cập nhật trạng thái đơn hàng
+        if (order.getCustomer() != null) {
+            String statusMessage = getOrderStatusMessage(newStatus);
+            String customerMessage = String.format("Đơn hàng #%s của bạn đã được cập nhật: %s", 
+                order.getCode(), statusMessage);
+            notificationProducerService.sendCustomerNotification(
+                order.getCustomer().getId(),
+                NotificationType.ORDER_UPDATE,
+                customerMessage,
+                "/orders/" + order.getId()
+            );
+        }
+
         OrdersDTO dto = ordersMapper.toDto(order);
         setCanReview(dto, order);
         return dto;
+    }
+
+    /**
+     * Lấy thông điệp trạng thái đơn hàng bằng tiếng Việt.
+     */
+    private String getOrderStatusMessage(OrderStatus status) {
+        switch (status) {
+            case PENDING:
+                return "Đang chờ xử lý";
+            case CONFIRMED:
+                return "Đã xác nhận";
+            case PROCESSING:
+                return "Đang xử lý";
+            case SHIPPING:
+                return "Đang vận chuyển";
+            case DELIVERED:
+                return "Đã giao hàng";
+            case COMPLETED:
+                return "Hoàn thành";
+            case CANCELLED:
+                return "Đã hủy";
+            default:
+                return status.toString();
+        }
     }
 
     @Override
@@ -637,6 +694,23 @@ public class OrdersServiceImpl implements OrdersService {
         createOrderStatusHistory(order, OrderStatus.CANCELLED, reason != null ? reason : "Đơn hàng bị hủy");
 
         order = ordersRepository.save(order);
+
+        // Gửi notification cho admin về đơn hàng bị hủy
+        String customerName = order.getCustomer() != null ? 
+            ((order.getCustomer().getFirstName() != null ? order.getCustomer().getFirstName() : "") + 
+             (order.getCustomer().getLastName() != null ? " " + order.getCustomer().getLastName() : "")).trim() : 
+            "Khách hàng";
+        if (customerName.isEmpty()) {
+            customerName = "Khách hàng #" + (order.getCustomer() != null ? order.getCustomer().getId() : "");
+        }
+        String adminMessage = String.format("Đơn hàng #%s từ %s đã bị hủy. Lý do: %s", 
+            order.getCode(), customerName, reason != null ? reason : "Không có lý do");
+        notificationProducerService.sendAdminNotification(
+            NotificationType.ORDER_CANCELLED,
+            adminMessage,
+            "/admin/orders/" + order.getId()
+        );
+
         OrdersDTO dto = ordersMapper.toDto(order);
         setCanReview(dto, order);
         return dto;
@@ -1202,5 +1276,45 @@ public class OrdersServiceImpl implements OrdersService {
         }
 
         return createdReviews;
+    }
+
+    @Override
+    public OrderStatus getNextOrderStatus(OrderStatus currentStatus, PaymentStatus paymentStatus) {
+        // Nếu đơn hàng đã bị hủy hoặc hoàn thành, không có trạng thái tiếp theo
+        if (currentStatus == OrderStatus.CANCELLED || currentStatus == OrderStatus.COMPLETED) {
+            return null;
+        }
+
+        // Luồng trạng thái đơn hàng:
+        // PENDING -> CONFIRMED -> PROCESSING -> SHIPPING -> DELIVERED -> COMPLETED
+        // Có thể hủy ở bất kỳ trạng thái nào trước DELIVERED
+
+        switch (currentStatus) {
+            case PENDING:
+                // PENDING -> CONFIRMED (cần thanh toán nếu là QR, hoặc có thể xác nhận luôn nếu COD)
+                if (paymentStatus == PaymentStatus.PAID || paymentStatus == PaymentStatus.UNPAID) {
+                    return OrderStatus.CONFIRMED;
+                }
+                return null;
+
+            case CONFIRMED:
+                // CONFIRMED -> PROCESSING
+                return OrderStatus.PROCESSING;
+
+            case PROCESSING:
+                // PROCESSING -> SHIPPING
+                return OrderStatus.SHIPPING;
+
+            case SHIPPING:
+                // SHIPPING -> DELIVERED
+                return OrderStatus.DELIVERED;
+
+            case DELIVERED:
+                // DELIVERED -> COMPLETED
+                return OrderStatus.COMPLETED;
+
+            default:
+                return null;
+        }
     }
 }

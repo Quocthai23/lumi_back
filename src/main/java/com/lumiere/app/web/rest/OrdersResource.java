@@ -1,5 +1,6 @@
 package com.lumiere.app.web.rest;
 
+import com.lumiere.app.domain.Orders;
 import com.lumiere.app.domain.enumeration.OrderStatus;
 import com.lumiere.app.repository.CustomerRepository;
 import com.lumiere.app.repository.OrdersRepository;
@@ -242,7 +243,9 @@ public class OrdersResource {
             request.getPaymentMethod(),
             request.getNote(),
             request.getRedeemedPoints(),
-            request.getVoucherCode()
+            request.getVoucherCode(),
+            request.getShippingFee(),
+            request.getShippingInfo()
         );
         return ResponseEntity.ok().body(ordersDTO);
     }
@@ -266,6 +269,7 @@ public class OrdersResource {
 
     /**
      * {@code PUT  /orders/{id}/cancel} : Hủy đơn hàng.
+     * Có thể được gọi bởi cả admin và customer (chỉ hủy đơn hàng của chính họ).
      *
      * @param id ID đơn hàng
      * @param request thông tin hủy đơn hàng
@@ -277,6 +281,26 @@ public class OrdersResource {
         @RequestBody(required = false) CancelOrderRequest request
     ) {
         LOG.debug("REST request to cancel order: {}", id);
+        
+        // Kiểm tra quyền: nếu không phải admin, chỉ cho phép hủy đơn hàng của chính họ
+        Optional<Long> currentUserId = SecurityUtils.getCurrentUserId();
+        if (currentUserId.isPresent()) {
+            Orders order = ordersRepository.findById(id)
+                .orElseThrow(() -> new BadRequestAlertException("Order not found", ENTITY_NAME, "idnotfound"));
+            
+            // Kiểm tra nếu user là customer và đơn hàng không thuộc về họ
+            if (order.getCustomer() != null && order.getCustomer().getUser() != null) {
+                Long orderUserId = order.getCustomer().getUser().getId();
+                if (!currentUserId.get().equals(orderUserId)) {
+                    // Kiểm tra xem user có phải admin không
+                    boolean isAdmin = SecurityUtils.hasCurrentUserAnyOfAuthorities("ROLE_ADMIN");
+                    if (!isAdmin) {
+                        throw new BadRequestAlertException("You can only cancel your own orders", ENTITY_NAME, "unauthorized");
+                    }
+                }
+            }
+        }
+        
         String reason = request != null ? request.getReason() : null;
         OrdersDTO ordersDTO = ordersService.cancelOrder(id, reason);
         return ResponseEntity.ok().body(ordersDTO);
@@ -361,6 +385,26 @@ public class OrdersResource {
     }
 
     /**
+     * {@code GET  /orders/{id}/next-status} : Lấy trạng thái đơn hàng tiếp theo.
+     *
+     * @param id ID đơn hàng
+     * @return the {@link ResponseEntity} with status {@code 200 (OK)} and the next status in body.
+     */
+    @GetMapping("/{id}/next-status")
+    public ResponseEntity<OrderStatus> getNextOrderStatus(@PathVariable Long id) {
+        LOG.debug("REST request to get next order status: {}", id);
+        Optional<OrdersDTO> ordersDTO = ordersService.findOne(id);
+        if (ordersDTO.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        OrderStatus nextStatus = ordersService.getNextOrderStatus(
+            ordersDTO.get().getStatus(),
+            ordersDTO.get().getPaymentStatus()
+        );
+        return ResponseEntity.ok().body(nextStatus);
+    }
+
+    /**
      * {@code POST  /orders/{id}/reviews} : Tạo review cho toàn bộ đơn hàng.
      * Tạo review cho từng sản phẩm trong order và bắn Kafka để tính điểm.
      *
@@ -386,6 +430,8 @@ public class OrdersResource {
         private String note;
         private Integer redeemedPoints;
         private String voucherCode;
+        private java.math.BigDecimal shippingFee;
+        private String shippingInfo;
 
         public String getPaymentMethod() {
             return paymentMethod;
@@ -417,6 +463,22 @@ public class OrdersResource {
 
         public void setVoucherCode(String voucherCode) {
             this.voucherCode = voucherCode;
+        }
+
+        public java.math.BigDecimal getShippingFee() {
+            return shippingFee;
+        }
+
+        public void setShippingFee(java.math.BigDecimal shippingFee) {
+            this.shippingFee = shippingFee;
+        }
+
+        public String getShippingInfo() {
+            return shippingInfo;
+        }
+
+        public void setShippingInfo(String shippingInfo) {
+            this.shippingInfo = shippingInfo;
         }
     }
 

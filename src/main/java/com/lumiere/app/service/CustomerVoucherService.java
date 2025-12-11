@@ -14,5 +14,14 @@ public interface CustomerVoucherService {
      * @return danh sách CustomerVoucherDTO
      */
     List<CustomerVoucherDTO> getVouchersByUserId(Long userId);
+
+    /**
+     * Claim (lấy) một voucher cho khách hàng.
+     *
+     * @param userId ID của user
+     * @param voucherId ID của voucher
+     * @return CustomerVoucherDTO đã được tạo
+     */
+    CustomerVoucherDTO claimVoucher(Long userId, Long voucherId);
 }
 

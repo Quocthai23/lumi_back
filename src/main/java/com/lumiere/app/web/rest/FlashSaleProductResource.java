@@ -81,8 +81,12 @@ public class FlashSaleProductResource {
         @Valid @RequestBody FlashSaleProductDTO flashSaleProductDTO
     ) throws URISyntaxException {
         LOG.debug("REST request to update FlashSaleProduct : {}, {}", id, flashSaleProductDTO);
-        if (flashSaleProductDTO.getId() == null) {
+        if (id == null) {
             throw new BadRequestAlertException("Invalid id", ENTITY_NAME, "idnull");
+        }
+        // Nếu DTO không có ID, set từ path variable
+        if (flashSaleProductDTO.getId() == null) {
+            flashSaleProductDTO.setId(id);
         }
         if (!Objects.equals(id, flashSaleProductDTO.getId())) {
             throw new BadRequestAlertException("Invalid ID", ENTITY_NAME, "idinvalid");
@@ -115,8 +119,12 @@ public class FlashSaleProductResource {
         @NotNull @RequestBody FlashSaleProductDTO flashSaleProductDTO
     ) throws URISyntaxException {
         LOG.debug("REST request to partial update FlashSaleProduct partially : {}, {}", id, flashSaleProductDTO);
-        if (flashSaleProductDTO.getId() == null) {
+        if (id == null) {
             throw new BadRequestAlertException("Invalid id", ENTITY_NAME, "idnull");
+        }
+        // Nếu DTO không có ID, set từ path variable
+        if (flashSaleProductDTO.getId() == null) {
+            flashSaleProductDTO.setId(id);
         }
         if (!Objects.equals(id, flashSaleProductDTO.getId())) {
             throw new BadRequestAlertException("Invalid ID", ENTITY_NAME, "idinvalid");
@@ -189,7 +197,32 @@ public class FlashSaleProductResource {
     }
 
     /**
-     * {@code GET  /flash-sale-products/product/:productId} : get all flash sale products by product id.
+     * {@code GET  /flash-sale-products/product-variant/:productVariantId} : get all flash sale products by product variant id.
+     *
+     * @param productVariantId the id of the product variant.
+     * @return the {@link ResponseEntity} with status {@code 200 (OK)} and the list of flash sale products in body.
+     */
+    @GetMapping("/product-variant/{productVariantId}")
+    public List<FlashSaleProductDTO> getFlashSaleProductsByProductVariantId(@PathVariable("productVariantId") Long productVariantId) {
+        LOG.debug("REST request to get FlashSaleProducts by productVariantId : {}", productVariantId);
+        return flashSaleProductService.findByProductVariantId(productVariantId);
+    }
+
+    /**
+     * {@code GET  /flash-sale-products/product-variant/:productVariantId/active} : get active flash sale product by product variant id.
+     *
+     * @param productVariantId the id of the product variant.
+     * @return the {@link ResponseEntity} with status {@code 200 (OK)} and with body the flashSaleProductDTO, or with status {@code 404 (Not Found)}.
+     */
+    @GetMapping("/product-variant/{productVariantId}/active")
+    public ResponseEntity<FlashSaleProductDTO> getActiveFlashSaleProductByProductVariantId(@PathVariable("productVariantId") Long productVariantId) {
+        LOG.debug("REST request to get active FlashSaleProduct by productVariantId : {}", productVariantId);
+        Optional<FlashSaleProductDTO> flashSaleProductDTO = flashSaleProductService.findActiveByProductVariantId(productVariantId);
+        return ResponseUtil.wrapOrNotFound(flashSaleProductDTO);
+    }
+
+    /**
+     * {@code GET  /flash-sale-products/product/:productId} : get all flash sale products by product id (tìm qua product variant).
      *
      * @param productId the id of the product.
      * @return the {@link ResponseEntity} with status {@code 200 (OK)} and the list of flash sale products in body.
@@ -201,7 +234,7 @@ public class FlashSaleProductResource {
     }
 
     /**
-     * {@code GET  /flash-sale-products/product/:productId/active} : get active flash sale product by product id.
+     * {@code GET  /flash-sale-products/product/:productId/active} : get active flash sale product by product id (tìm qua product variant).
      *
      * @param productId the id of the product.
      * @return the {@link ResponseEntity} with status {@code 200 (OK)} and with body the flashSaleProductDTO, or with status {@code 404 (Not Found)}.

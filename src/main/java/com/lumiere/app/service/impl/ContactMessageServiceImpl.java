@@ -1,11 +1,17 @@
 package com.lumiere.app.service.impl;
 
 import com.lumiere.app.domain.ContactMessage;
+import com.lumiere.app.domain.Customer;
+import com.lumiere.app.domain.User;
 import com.lumiere.app.domain.enumeration.ContactStatus;
+import com.lumiere.app.domain.enumeration.NotificationType;
 import com.lumiere.app.repository.ContactMessageRepository;
+import com.lumiere.app.repository.CustomerRepository;
+import com.lumiere.app.repository.UserRepository;
 import com.lumiere.app.service.ContactMessageService;
 import com.lumiere.app.service.MailService;
 import com.lumiere.app.service.dto.ContactMessageDTO;
+import com.lumiere.app.service.kafka.NotificationProducerService;
 import com.lumiere.app.service.mapper.ContactMessageMapper;
 import java.time.Instant;
 import java.util.Optional;
@@ -34,16 +40,28 @@ public class ContactMessageServiceImpl implements ContactMessageService {
 
     private final JHipsterProperties jHipsterProperties;
 
+    private final NotificationProducerService notificationProducerService;
+
+    private final UserRepository userRepository;
+
+    private final CustomerRepository customerRepository;
+
     public ContactMessageServiceImpl(
         ContactMessageRepository contactMessageRepository,
         ContactMessageMapper contactMessageMapper,
         MailService mailService,
-        JHipsterProperties jHipsterProperties
+        JHipsterProperties jHipsterProperties,
+        NotificationProducerService notificationProducerService,
+        UserRepository userRepository,
+        CustomerRepository customerRepository
     ) {
         this.contactMessageRepository = contactMessageRepository;
         this.contactMessageMapper = contactMessageMapper;
         this.mailService = mailService;
         this.jHipsterProperties = jHipsterProperties;
+        this.notificationProducerService = notificationProducerService;
+        this.userRepository = userRepository;
+        this.customerRepository = customerRepository;
     }
 
     @Override
@@ -117,6 +135,16 @@ public class ContactMessageServiceImpl implements ContactMessageService {
         ContactMessage contactMessage = contactMessageMapper.toEntity(contactMessageDTO);
         contactMessage = contactMessageRepository.save(contactMessage);
 
+        // Gửi notification cho admin qua Kafka
+        String adminMessage = String.format("Có tin nhắn liên hệ mới từ %s: %s", 
+            contactMessageDTO.getFullName() != null ? contactMessageDTO.getFullName() : "Khách hàng",
+            contactMessageDTO.getSubject() != null ? contactMessageDTO.getSubject() : "Không có chủ đề");
+        notificationProducerService.sendAdminNotification(
+            NotificationType.NEW_CONTACT,
+            adminMessage,
+            "/admin/contact-messages/" + contactMessage.getId()
+        );
+
         // Send email notification to admin
         try {
             String adminEmail = jHipsterProperties.getMail().getFrom();
@@ -159,6 +187,29 @@ public class ContactMessageServiceImpl implements ContactMessageService {
             contactMessage.setAdminNote(adminNote);
         }
         contactMessage = contactMessageRepository.save(contactMessage);
+
+        // Gửi notification cho customer nếu tìm thấy customer từ email
+        if (contactMessage.getEmail() != null) {
+            try {
+                Optional<User> userOpt = userRepository.findOneByEmailIgnoreCase(contactMessage.getEmail());
+                if (userOpt.isPresent()) {
+                    Optional<Customer> customerOpt = customerRepository.findByUserId(userOpt.get().getId());
+                    if (customerOpt.isPresent()) {
+                        String customerMessage = String.format("Chúng tôi đã phản hồi tin nhắn liên hệ của bạn về: %s", 
+                            contactMessage.getSubject() != null ? contactMessage.getSubject() : "tin nhắn của bạn");
+                        notificationProducerService.sendCustomerNotification(
+                            customerOpt.get().getId(),
+                            NotificationType.CONTACT_REPLY,
+                            customerMessage,
+                            "/contact-messages/" + contactMessage.getId()
+                        );
+                    }
+                }
+            } catch (Exception e) {
+                LOG.error("Failed to send notification to customer for contact reply", e);
+                // Không throw exception để không ảnh hưởng đến business logic
+            }
+        }
 
         return contactMessageMapper.toDto(contactMessage);
     }

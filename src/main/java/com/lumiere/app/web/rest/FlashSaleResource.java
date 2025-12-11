@@ -2,7 +2,9 @@ package com.lumiere.app.web.rest;
 
 import com.lumiere.app.repository.FlashSaleRepository;
 import com.lumiere.app.service.FlashSaleService;
+import com.lumiere.app.service.FlashSaleProductService;
 import com.lumiere.app.service.dto.FlashSaleDTO;
+import com.lumiere.app.service.dto.FlashSaleProductDTO;
 import com.lumiere.app.web.rest.errors.BadRequestAlertException;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
@@ -37,9 +39,16 @@ public class FlashSaleResource {
 
     private final FlashSaleRepository flashSaleRepository;
 
-    public FlashSaleResource(FlashSaleService flashSaleService, FlashSaleRepository flashSaleRepository) {
+    private final FlashSaleProductService flashSaleProductService;
+
+    public FlashSaleResource(
+        FlashSaleService flashSaleService,
+        FlashSaleRepository flashSaleRepository,
+        FlashSaleProductService flashSaleProductService
+    ) {
         this.flashSaleService = flashSaleService;
         this.flashSaleRepository = flashSaleRepository;
+        this.flashSaleProductService = flashSaleProductService;
     }
 
     /**
@@ -212,5 +221,17 @@ public class FlashSaleResource {
         LOG.debug("REST request to get current FlashSale");
         Optional<FlashSaleDTO> flashSaleDTO = flashSaleService.findCurrentFlashSale();
         return ResponseUtil.wrapOrNotFound(flashSaleDTO);
+    }
+
+    /**
+     * {@code GET  /flash-sales/:id/products} : get all products (flash sale products) by flash sale id.
+     *
+     * @param id the id of the flash sale.
+     * @return the {@link ResponseEntity} with status {@code 200 (OK)} and the list of flash sale products in body.
+     */
+    @GetMapping("/{id}/products")
+    public List<FlashSaleProductDTO> getFlashSaleProducts(@PathVariable("id") Long id) {
+        LOG.debug("REST request to get FlashSaleProducts by flashSaleId : {}", id);
+        return flashSaleProductService.findByFlashSaleId(id);
     }
 }

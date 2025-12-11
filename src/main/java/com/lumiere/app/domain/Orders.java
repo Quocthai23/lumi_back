@@ -70,6 +70,14 @@ public class Orders implements Serializable {
     @Column(name = "discount_amount", precision = 21, scale = 2)
     private BigDecimal discountAmount;
 
+    @DecimalMin(value = "0")
+    @Column(name = "shipping_cost", precision = 21, scale = 2)
+    private BigDecimal shippingCost;
+
+    @Lob
+    @Column(name = "shipping_info", columnDefinition = "TEXT")
+    private String shippingInfo;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JsonIgnoreProperties(value = { "user", "orders", "wishlists", "addresses", "loyaltyHistories", "notifications" }, allowSetters = true)
     private Customer customer;
@@ -220,6 +228,32 @@ public class Orders implements Serializable {
         this.discountAmount = discountAmount;
     }
 
+    public BigDecimal getShippingCost() {
+        return this.shippingCost;
+    }
+
+    public Orders shippingCost(BigDecimal shippingCost) {
+        this.setShippingCost(shippingCost);
+        return this;
+    }
+
+    public void setShippingCost(BigDecimal shippingCost) {
+        this.shippingCost = shippingCost;
+    }
+
+    public String getShippingInfo() {
+        return this.shippingInfo;
+    }
+
+    public Orders shippingInfo(String shippingInfo) {
+        this.setShippingInfo(shippingInfo);
+        return this;
+    }
+
+    public void setShippingInfo(String shippingInfo) {
+        this.shippingInfo = shippingInfo;
+    }
+
     public Customer getCustomer() {
         return this.customer;
     }
@@ -341,6 +375,8 @@ public class Orders implements Serializable {
             ", placedAt='" + getPlacedAt() + "'" +
             ", redeemedPoints=" + getRedeemedPoints() +
             ", discountAmount=" + getDiscountAmount() +
+            ", shippingCost=" + getShippingCost() +
+            ", shippingInfo='" + getShippingInfo() + "'" +
             "}";
     }
 }

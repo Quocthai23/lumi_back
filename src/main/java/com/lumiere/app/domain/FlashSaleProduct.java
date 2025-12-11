@@ -43,8 +43,8 @@ public class FlashSaleProduct implements Serializable {
     private FlashSale flashSale;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JsonIgnoreProperties(value = { "variants", "reviews", "questions", "collections", "wishlistedBies" }, allowSetters = true)
-    private Product product;
+    @JsonIgnoreProperties(value = { "product", "flashSaleProducts" }, allowSetters = true)
+    private ProductVariant productVariant;
 
     // jhipster-needle-entity-add-field - JHipster will add fields here
 
@@ -113,16 +113,16 @@ public class FlashSaleProduct implements Serializable {
         return this;
     }
 
-    public Product getProduct() {
-        return this.product;
+    public ProductVariant getProductVariant() {
+        return this.productVariant;
     }
 
-    public void setProduct(Product product) {
-        this.product = product;
+    public void setProductVariant(ProductVariant productVariant) {
+        this.productVariant = productVariant;
     }
 
-    public FlashSaleProduct product(Product product) {
-        this.setProduct(product);
+    public FlashSaleProduct productVariant(ProductVariant productVariant) {
+        this.setProductVariant(productVariant);
         return this;
     }
 

@@ -1,6 +1,7 @@
 package com.lumiere.app.web.rest;
 
 import com.lumiere.app.repository.ProductVariantRepository;
+import com.lumiere.app.service.FlashSaleProductService;
 import com.lumiere.app.service.ProductVariantQueryService;
 import com.lumiere.app.service.ProductVariantService;
 import com.lumiere.app.service.criteria.ProductVariantCriteria;
@@ -41,14 +42,18 @@ public class ProductVariantResource {
 
     private final ProductVariantQueryService productVariantQueryService;
 
+    private final FlashSaleProductService flashSaleProductService;
+
     public ProductVariantResource(
         ProductVariantService productVariantService,
         ProductVariantRepository productVariantRepository,
-        ProductVariantQueryService productVariantQueryService
+        ProductVariantQueryService productVariantQueryService,
+        FlashSaleProductService flashSaleProductService
     ) {
         this.productVariantService = productVariantService;
         this.productVariantRepository = productVariantRepository;
         this.productVariantQueryService = productVariantQueryService;
+        this.flashSaleProductService = flashSaleProductService;
     }
 
     /**
@@ -208,7 +213,15 @@ public class ProductVariantResource {
         @RequestParam @NotNull List<Long> productIds
     ) {
         List<ProductVariantDTO> rs = productIds.stream().map(id -> {
-            return productVariantService.findByProductId(id).stream().filter(ProductVariantDTO::getIsDefault).findFirst().orElse(null);
+            ProductVariantDTO variant = productVariantService.findByProductId(id).stream().filter(ProductVariantDTO::getIsDefault).findFirst().orElse(null);
+            if (variant != null && variant.getId() != null) {
+                // Kiểm tra flash sale và set promotionPrice
+                flashSaleProductService.findActiveByProductVariantId(variant.getId())
+                    .ifPresent(flashSaleProduct -> {
+                        variant.setPromotionPrice(flashSaleProduct.getSalePrice());
+                    });
+            }
+            return variant;
         }).toList();
         return ResponseEntity.ok().body(rs);
     }

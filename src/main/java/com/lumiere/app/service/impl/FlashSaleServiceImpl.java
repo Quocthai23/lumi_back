@@ -1,9 +1,11 @@
 package com.lumiere.app.service.impl;
 
 import com.lumiere.app.domain.FlashSale;
+import com.lumiere.app.domain.enumeration.NotificationType;
 import com.lumiere.app.repository.FlashSaleRepository;
 import com.lumiere.app.service.FlashSaleService;
 import com.lumiere.app.service.dto.FlashSaleDTO;
+import com.lumiere.app.service.kafka.NotificationProducerService;
 import com.lumiere.app.service.mapper.FlashSaleMapper;
 import java.time.Instant;
 import java.util.LinkedList;
@@ -28,9 +30,16 @@ public class FlashSaleServiceImpl implements FlashSaleService {
 
     private final FlashSaleMapper flashSaleMapper;
 
-    public FlashSaleServiceImpl(FlashSaleRepository flashSaleRepository, FlashSaleMapper flashSaleMapper) {
+    private final NotificationProducerService notificationProducerService;
+
+    public FlashSaleServiceImpl(
+        FlashSaleRepository flashSaleRepository, 
+        FlashSaleMapper flashSaleMapper,
+        NotificationProducerService notificationProducerService
+    ) {
         this.flashSaleRepository = flashSaleRepository;
         this.flashSaleMapper = flashSaleMapper;
+        this.notificationProducerService = notificationProducerService;
     }
 
     @Override
@@ -38,7 +47,23 @@ public class FlashSaleServiceImpl implements FlashSaleService {
         LOG.debug("Request to save FlashSale : {}", flashSaleDTO);
         validateFlashSale(flashSaleDTO);
         FlashSale flashSale = flashSaleMapper.toEntity(flashSaleDTO);
+        boolean isNew = flashSale.getId() == null;
         flashSale = flashSaleRepository.save(flashSale);
+        
+        // Gửi notification cho tất cả customers về flashsale mới
+        if (isNew && flashSale.getStartTime() != null && flashSale.getStartTime().isAfter(java.time.Instant.now())) {
+            // Note: Trong thực tế, có thể cần gửi cho từng customer hoặc broadcast
+            // Ở đây tôi sẽ gửi notification cho admin để admin biết có flashsale mới
+            // và có thể gửi email cho customers
+            String adminMessage = String.format("FlashSale mới đã được tạo: %s (Bắt đầu: %s)", 
+                flashSale.getName(), flashSale.getStartTime());
+            notificationProducerService.sendAdminNotification(
+                NotificationType.NEW_FLASHSALE,
+                adminMessage,
+                "/admin/flash-sales/" + flashSale.getId()
+            );
+        }
+        
         return flashSaleMapper.toDto(flashSale);
     }
 

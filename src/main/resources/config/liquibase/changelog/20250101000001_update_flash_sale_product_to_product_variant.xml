@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:ext="http://www.liquibase.org/xml/ns/dbchangelog-ext"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd
+                        http://www.liquibase.org/xml/ns/dbchangelog-ext http://www.liquibase.org/xml/ns/dbchangelog-ext.xsd">
+
+    <!--
+        Update FlashSaleProduct: Change from Product to ProductVariant relationship
+        This migration:
+        1. Drops the old foreign key constraint on product_id
+        2. Adds new column product_variant_id
+        3. Adds foreign key constraint on product_variant_id
+        4. Drops the old product_id column
+    -->
+    <changeSet id="20250101000001-1" author="system">
+        <!-- Drop old foreign key constraint -->
+        <dropForeignKeyConstraint baseTableName="flash_sale_product" 
+                                  constraintName="fk_flash_sale_product__product_id"/>
+    </changeSet>
+
+    <changeSet id="20250101000001-2" author="system">
+        <!-- Add new column product_variant_id -->
+        <addColumn tableName="flash_sale_product">
+            <column name="product_variant_id" type="bigint">
+                <constraints nullable="true" />
+            </column>
+        </addColumn>
+    </changeSet>
+
+    <changeSet id="20250101000001-3" author="system">
+        <!-- Add foreign key constraint for product_variant_id -->
+        <addForeignKeyConstraint baseColumnNames="product_variant_id"
+                                 baseTableName="flash_sale_product"
+                                 constraintName="fk_flash_sale_product__product_variant_id"
+                                 referencedColumnNames="id"
+                                 referencedTableName="product_variant"
+                                 />
+    </changeSet>
+
+    <changeSet id="20250101000001-4" author="system">
+        <!-- Drop old product_id column -->
+        <dropColumn tableName="flash_sale_product" columnName="product_id"/>
+    </changeSet>
+
+</databaseChangeLog>
+

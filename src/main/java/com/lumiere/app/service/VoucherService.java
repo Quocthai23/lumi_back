@@ -7,6 +7,8 @@ import com.lumiere.app.service.dto.VoucherDTO;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 /**
  * Service Interface for managing {@link com.lumiere.app.domain.Voucher}.
@@ -42,6 +44,14 @@ public interface VoucherService {
      * @return the list of entities.
      */
     List<VoucherDTO> findAll();
+
+    /**
+     * Get all available vouchers (ACTIVE and not expired) with pagination.
+     *
+     * @param pageable the pagination information.
+     * @return the page of entities.
+     */
+    Page<VoucherDTO> findAllAvailable(Pageable pageable);
 
     /**
      * Get the "id" voucher.

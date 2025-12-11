@@ -73,7 +73,15 @@ public interface FlashSaleProductService {
     List<FlashSaleProductDTO> findByFlashSaleId(Long flashSaleId);
 
     /**
-     * Get active flash sale product by product id.
+     * Get active flash sale product by product variant id.
+     *
+     * @param productVariantId the id of the product variant.
+     * @return the flash sale product if found and active.
+     */
+    Optional<FlashSaleProductDTO> findActiveByProductVariantId(Long productVariantId);
+
+    /**
+     * Get active flash sale product by product id (tìm qua product variant).
      *
      * @param productId the id of the product.
      * @return the flash sale product if found and active.
@@ -81,7 +89,15 @@ public interface FlashSaleProductService {
     Optional<FlashSaleProductDTO> findActiveByProductId(Long productId);
 
     /**
-     * Get all flash sale products by product id.
+     * Get all flash sale products by product variant id.
+     *
+     * @param productVariantId the id of the product variant.
+     * @return the list of flash sale products.
+     */
+    List<FlashSaleProductDTO> findByProductVariantId(Long productVariantId);
+
+    /**
+     * Get all flash sale products by product id (tìm qua product variant).
      *
      * @param productId the id of the product.
      * @return the list of flash sale products.
