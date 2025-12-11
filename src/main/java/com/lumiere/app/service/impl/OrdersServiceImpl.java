@@ -95,7 +95,7 @@ public class OrdersServiceImpl implements OrdersService {
         VoucherService voucherService,
         ProductVariantMapper productVariantMapper,
         KafkaTemplate<String, Object> kafkaTemplate,
-        InventoryRepository inventoryRepository, ProductMapper productMapper, ProductService productService) {
+        InventoryRepository inventoryRepository, ProductMapper productMapper, ProductService productService, ProductVariantService productVariantService) {
         this.ordersRepository = ordersRepository;
         this.ordersMapper = ordersMapper;
         this.customerService = customerService;
@@ -363,86 +363,23 @@ public class OrdersServiceImpl implements OrdersService {
             throw new IllegalArgumentException("Cart is empty");
         }
 
-        // Kiểm tra và trừ stock quantity trước khi tạo order (atomic operations)
         for (CartItem cartItem : cartItems) {
             ProductVariant variant = productVariantRepository.findById(cartItem.getVariantId())
                 .orElseThrow(() -> new IllegalArgumentException("Product variant not found: " + cartItem.getVariantId()));
 
-            // Lấy inventory với pessimistic lock để đảm bảo atomic
-            List<Inventory> inventories = inventoryRepository.findByProductVariantIdForUpdate(variant.getId());
-
-            if (inventories.isEmpty()) {
-                throw new IllegalArgumentException(
-                    "Sản phẩm " + variant.getSku() + " không có trong kho. Vui lòng kiểm tra lại."
-                );
-            }
-
-            // Tính tổng số lượng có sẵn
-            long totalAvailable = inventories.stream()
-                .mapToLong(Inventory::getStockQuantity)
-                .sum();
-
-            if (totalAvailable < cartItem.getQuantity()) {
-                throw new IllegalArgumentException(
-                    "Sản phẩm " + variant.getSku() + " không đủ số lượng. " +
-                    "Có sẵn: " + totalAvailable + ", yêu cầu: " + cartItem.getQuantity()
-                );
-            }
-
-            // Trừ stock từ các warehouse theo thứ tự ưu tiên (từ nhiều đến ít)
-            long remainingQuantity = cartItem.getQuantity();
-            for (Inventory inventory : inventories) {
-                if (remainingQuantity <= 0) {
-                    break;
-                }
-
-                long deductAmount = Math.min(remainingQuantity, inventory.getStockQuantity());
-                if (deductAmount > 0) {
-                    // Sử dụng atomic update
-                    int updated = inventoryRepository.deductStockQuantity(inventory.getId(), deductAmount);
-                    if (updated == 0) {
-                        // Nếu không cập nhật được (có thể do race condition), thử lại với inventory mới
-                        Inventory refreshedInventory = inventoryRepository.findById(inventory.getId())
-                            .orElseThrow(() -> new IllegalArgumentException("Inventory not found: " + inventory.getId()));
-
-                        if (refreshedInventory.getStockQuantity() < deductAmount) {
-                            // Không đủ hàng, rollback transaction sẽ được xử lý tự động
-                            throw new IllegalArgumentException(
-                                "Sản phẩm " + variant.getSku() + " không đủ số lượng trong kho. " +
-                                "Vui lòng thử lại sau."
-                            );
-                        }
-                        // Thử lại với số lượng thực tế
-                        deductAmount = Math.min(remainingQuantity, refreshedInventory.getStockQuantity());
-                        updated = inventoryRepository.deductStockQuantity(inventory.getId(), deductAmount);
-                        if (updated == 0) {
-                            throw new IllegalArgumentException(
-                                "Không thể cập nhật tồn kho cho sản phẩm " + variant.getSku() + ". Vui lòng thử lại."
-                            );
-                        }
-                    }
-                    remainingQuantity -= deductAmount;
-                    LOG.debug(
-                        "Deducted {} from inventory {} for variant {}, remaining: {}",
-                        deductAmount,
-                        inventory.getId(),
-                        variant.getSku(),
-                        remainingQuantity
-                    );
-                }
-            }
-
-            if (remainingQuantity > 0) {
+            if (variant.getStockQuantity() - cartItem.getQuantity() < 0) {
                 throw new IllegalArgumentException(
                     "Không thể trừ đủ số lượng cho sản phẩm " + variant.getSku() + ". Vui lòng thử lại."
                 );
             }
+
+            variant.setStockQuantity(variant.getStockQuantity() - cartItem.getQuantity());
+            variant = productVariantRepository.save(variant);
         }
 
         // Tạo mã đơn hàng duy nhất
         String orderCode = generateOrderCode();
 
-        // Tính tổng tiền sản phẩm
         BigDecimal subtotal = BigDecimal.ZERO;
         for (CartItem cartItem : cartItems) {
             BigDecimal itemTotal = cartItem.getTotalPrice();
@@ -550,6 +487,11 @@ public class OrdersServiceImpl implements OrdersService {
         order.setTotalAmount(totalAmount);
         order.setNote(note);
         order.setPaymentMethod(paymentMethod);
+
+        if(paymentMethod.equals("COD")){
+            order.setStatus(OrderStatus.CONFIRMED);
+        }
+
         order.setPlacedAt(Instant.now());
         order.setRedeemedPoints(redeemedPoints != null ? redeemedPoints : 0);
         order.setDiscountAmount(discountAmount);

@@ -44,32 +44,6 @@ public class ReviewRatingListener {
      * @param message message từ Kafka
      * @param acknowledgment acknowledgment để commit offset
      */
-    @KafkaListener(topics = "review-rating", groupId = "${spring.kafka.consumer.group-id}")
-    @Transactional
-    public void handleReviewRating(String message, Acknowledgment acknowledgment) {
-        try {
-            LOG.debug("Received Kafka message for review-rating: {}", message);
-
-            // Parse message
-            ReviewRatingMessage reviewMessage = objectMapper.readValue(message, ReviewRatingMessage.class);
-            LOG.info("Processing review rating for product: {}, review: {}", reviewMessage.getProductId(), reviewMessage.getReviewId());
-
-            Product product = productRepository.findById(reviewMessage.getProductId())
-                .orElseThrow(() -> new IllegalArgumentException("Product not found: " + reviewMessage.getProductId()));
-
-            // Tính lại average rating và review count
-            updateProductRating(product);
-
-            // Commit offset sau khi xử lý thành công
-            acknowledgment.acknowledge();
-            LOG.info("Successfully processed review rating for product: {}", reviewMessage.getProductId());
-
-        } catch (Exception e) {
-            LOG.error("Error processing review rating message: {}", message, e);
-            // Không commit offset để Kafka retry message này
-            // Hoặc có thể gửi vào dead letter queue nếu muốn
-        }
-    }
 
     /**
      * Cập nhật average rating và review count của product dựa trên tất cả reviews đã được approve.
