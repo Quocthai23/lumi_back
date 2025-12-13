@@ -81,6 +81,7 @@ spring:
       ack-mode: manual_immediate
     topic:
       notification: notification-topic
+      order-stock-processing: order-stock-processing
 
 server:
   port: 8080

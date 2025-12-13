@@ -256,4 +256,15 @@ public class FlashSaleProductResource {
         LOG.debug("REST request to get all available FlashSaleProducts");
         return flashSaleProductService.findAvailableProducts();
     }
+
+    /**
+     * {@code GET  /flash-sale-products/sorted-by-discount} : get all flash sale products sorted by discount percentage (highest discount first).
+     *
+     * @return the {@link ResponseEntity} with status {@code 200 (OK)} and the list of flash sale products sorted by discount percentage in body.
+     */
+    @GetMapping("/sorted-by-discount")
+    public List<FlashSaleProductDTO> getAllFlashSaleProductsSortedByDiscount() {
+        LOG.debug("REST request to get all FlashSaleProducts sorted by discount percentage");
+        return flashSaleProductService.findAllSortedByDiscountPercent();
+    }
 }

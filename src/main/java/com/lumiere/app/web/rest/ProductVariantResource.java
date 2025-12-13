@@ -9,6 +9,7 @@ import com.lumiere.app.service.dto.ProductVariantDTO;
 import com.lumiere.app.web.rest.errors.BadRequestAlertException;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
+import java.math.BigDecimal;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.List;
@@ -213,15 +214,59 @@ public class ProductVariantResource {
         @RequestParam @NotNull List<Long> productIds
     ) {
         List<ProductVariantDTO> rs = productIds.stream().map(id -> {
-            ProductVariantDTO variant = productVariantService.findByProductId(id).stream().filter(ProductVariantDTO::getIsDefault).findFirst().orElse(null);
-            if (variant != null && variant.getId() != null) {
-                // Kiểm tra flash sale và set promotionPrice
-                flashSaleProductService.findActiveByProductVariantId(variant.getId())
+            // Lấy tất cả variants của sản phẩm
+            List<ProductVariantDTO> allVariants = productVariantService.findByProductId(id);
+            
+            if (allVariants.isEmpty()) {
+                return null;
+            }
+            
+            // Lấy promotionPrice từ FlashSale cho tất cả variants
+            allVariants.forEach(variant -> {
+                if (variant.getId() != null) {
+                    flashSaleProductService.findActiveByProductVariantId(variant.getId())
+                        .ifPresent(flashSaleProduct -> {
+                            variant.setPromotionPrice(flashSaleProduct.getSalePrice());
+                        });
+                }
+            });
+            
+            // Tìm variant có giá rẻ nhất (ưu tiên promotionPrice nếu có và nhỏ hơn price, nếu không có thì dùng price)
+            ProductVariantDTO cheapestVariant = allVariants.stream()
+                .min((v1, v2) -> {
+                    // Tính giá thực tế của variant 1 (ưu tiên promotionPrice nếu có và nhỏ hơn price)
+                    BigDecimal price1;
+                    if (v1.getPromotionPrice() != null && v1.getPrice() != null 
+                        && v1.getPromotionPrice().compareTo(BigDecimal.ZERO) > 0
+                        && v1.getPromotionPrice().compareTo(v1.getPrice()) < 0) {
+                        price1 = v1.getPromotionPrice();
+                    } else {
+                        price1 = (v1.getPrice() != null ? v1.getPrice() : BigDecimal.ZERO);
+                    }
+                    
+                    // Tính giá thực tế của variant 2 (ưu tiên promotionPrice nếu có và nhỏ hơn price)
+                    BigDecimal price2;
+                    if (v2.getPromotionPrice() != null && v2.getPrice() != null 
+                        && v2.getPromotionPrice().compareTo(BigDecimal.ZERO) > 0
+                        && v2.getPromotionPrice().compareTo(v2.getPrice()) < 0) {
+                        price2 = v2.getPromotionPrice();
+                    } else {
+                        price2 = (v2.getPrice() != null ? v2.getPrice() : BigDecimal.ZERO);
+                    }
+                    
+                    return price1.compareTo(price2);
+                })
+                .orElse(null);
+            
+            // Đảm bảo promotionPrice được set từ FlashSale cho variant rẻ nhất
+            if (cheapestVariant != null && cheapestVariant.getId() != null) {
+                flashSaleProductService.findActiveByProductVariantId(cheapestVariant.getId())
                     .ifPresent(flashSaleProduct -> {
-                        variant.setPromotionPrice(flashSaleProduct.getSalePrice());
+                        cheapestVariant.setPromotionPrice(flashSaleProduct.getSalePrice());
                     });
             }
-            return variant;
+            
+            return cheapestVariant;
         }).toList();
         return ResponseEntity.ok().body(rs);
     }

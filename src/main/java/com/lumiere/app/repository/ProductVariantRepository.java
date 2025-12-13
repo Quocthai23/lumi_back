@@ -1,6 +1,5 @@
 package com.lumiere.app.repository;
 
-import com.lumiere.app.domain.OptionVariant;
 import com.lumiere.app.domain.ProductVariant;
 
 import java.util.Collection;
@@ -47,4 +46,16 @@ public interface ProductVariantRepository extends JpaRepository<ProductVariant, 
     void deleteByIdIn(Collection<Long> ids);
 
     List<ProductVariant> findAllByIdIn(Collection<Long> ids);
+
+    /**
+     * Lấy giá rẻ nhất của mỗi product (chỉ variant có giá > 0)
+     */
+    @Query("""
+        SELECT v.product.id, MIN(v.price)
+        FROM ProductVariant v
+        WHERE v.product.id IN :productIds
+          AND v.price > 0
+        GROUP BY v.product.id
+        """)
+    List<Object[]> findMinPriceByProductIds(@Param("productIds") List<Long> productIds);
 }

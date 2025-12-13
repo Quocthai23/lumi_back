@@ -110,4 +110,11 @@ public interface FlashSaleProductService {
      * @return the list of available flash sale products.
      */
     List<FlashSaleProductDTO> findAvailableProducts();
+
+    /**
+     * Get all flash sale products sorted by discount percentage (highest discount first).
+     *
+     * @return the list of flash sale products sorted by discount percentage descending.
+     */
+    List<FlashSaleProductDTO> findAllSortedByDiscountPercent();
 }

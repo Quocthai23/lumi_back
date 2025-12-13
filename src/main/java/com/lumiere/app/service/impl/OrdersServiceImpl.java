@@ -13,8 +13,11 @@ import com.lumiere.app.security.SecurityUtils;
 import com.lumiere.app.service.*;
 import com.lumiere.app.service.dto.*;
 import com.lumiere.app.service.kafka.NotificationProducerService;
+import com.lumiere.app.service.kafka.OrderStockProducerService;
+import com.lumiere.app.service.OrderStockRestoreService;
 import com.lumiere.app.service.mapper.OrderStatusHistoryMapper;
 import com.lumiere.app.service.mapper.OrdersMapper;
+import com.lumiere.app.service.dto.OrderStockProcessingMessage;
 
 import java.math.BigDecimal;
 import java.net.URLEncoder;
@@ -78,6 +81,8 @@ public class OrdersServiceImpl implements OrdersService {
     private final ProductMapper productMapper;
     private final ProductService productService;
     private final NotificationProducerService notificationProducerService;
+    private final OrderStockProducerService orderStockProducerService;
+    private final OrderStockRestoreService orderStockRestoreService;
 
     public OrdersServiceImpl(
         OrdersRepository ordersRepository,
@@ -99,7 +104,9 @@ public class OrdersServiceImpl implements OrdersService {
         ProductVariantMapper productVariantMapper,
         KafkaTemplate<String, Object> kafkaTemplate,
         InventoryRepository inventoryRepository, ProductMapper productMapper, ProductService productService,
-        NotificationProducerService notificationProducerService) {
+        NotificationProducerService notificationProducerService,
+        OrderStockProducerService orderStockProducerService,
+        OrderStockRestoreService orderStockRestoreService) {
         this.ordersRepository = ordersRepository;
         this.ordersMapper = ordersMapper;
         this.customerService = customerService;
@@ -122,6 +129,8 @@ public class OrdersServiceImpl implements OrdersService {
         this.productMapper = productMapper;
         this.productService = productService;
         this.notificationProducerService = notificationProducerService;
+        this.orderStockProducerService = orderStockProducerService;
+        this.orderStockRestoreService = orderStockRestoreService;
     }
 
     @Override
@@ -368,82 +377,6 @@ public class OrdersServiceImpl implements OrdersService {
             throw new IllegalArgumentException("Cart is empty");
         }
 
-        // Kiểm tra và trừ stock quantity trước khi tạo order (atomic operations)
-        for (CartItem cartItem : cartItems) {
-            ProductVariant variant = productVariantRepository.findById(cartItem.getVariantId())
-                .orElseThrow(() -> new IllegalArgumentException("Product variant not found: " + cartItem.getVariantId()));
-
-            // Lấy inventory với pessimistic lock để đảm bảo atomic
-            List<Inventory> inventories = inventoryRepository.findByProductVariantIdForUpdate(variant.getId());
-
-            if (inventories.isEmpty()) {
-                throw new IllegalArgumentException(
-                    "Sản phẩm " + variant.getSku() + " không có trong kho. Vui lòng kiểm tra lại."
-                );
-            }
-
-            // Tính tổng số lượng có sẵn
-            long totalAvailable = inventories.stream()
-                .mapToLong(Inventory::getStockQuantity)
-                .sum();
-
-            if (totalAvailable < cartItem.getQuantity()) {
-                throw new IllegalArgumentException(
-                    "Sản phẩm " + variant.getSku() + " không đủ số lượng. " +
-                    "Có sẵn: " + totalAvailable + ", yêu cầu: " + cartItem.getQuantity()
-                );
-            }
-
-            // Trừ stock từ các warehouse theo thứ tự ưu tiên (từ nhiều đến ít)
-            long remainingQuantity = cartItem.getQuantity();
-            for (Inventory inventory : inventories) {
-                if (remainingQuantity <= 0) {
-                    break;
-                }
-
-                long deductAmount = Math.min(remainingQuantity, inventory.getStockQuantity());
-                if (deductAmount > 0) {
-                    // Sử dụng atomic update
-                    int updated = inventoryRepository.deductStockQuantity(inventory.getId(), deductAmount);
-                    if (updated == 0) {
-                        // Nếu không cập nhật được (có thể do race condition), thử lại với inventory mới
-                        Inventory refreshedInventory = inventoryRepository.findById(inventory.getId())
-                            .orElseThrow(() -> new IllegalArgumentException("Inventory not found: " + inventory.getId()));
-
-                        if (refreshedInventory.getStockQuantity() < deductAmount) {
-                            // Không đủ hàng, rollback transaction sẽ được xử lý tự động
-                            throw new IllegalArgumentException(
-                                "Sản phẩm " + variant.getSku() + " không đủ số lượng trong kho. " +
-                                "Vui lòng thử lại sau."
-                            );
-                        }
-                        // Thử lại với số lượng thực tế
-                        deductAmount = Math.min(remainingQuantity, refreshedInventory.getStockQuantity());
-                        updated = inventoryRepository.deductStockQuantity(inventory.getId(), deductAmount);
-                        if (updated == 0) {
-                            throw new IllegalArgumentException(
-                                "Không thể cập nhật tồn kho cho sản phẩm " + variant.getSku() + ". Vui lòng thử lại."
-                            );
-                        }
-                    }
-                    remainingQuantity -= deductAmount;
-                    LOG.debug(
-                        "Deducted {} from inventory {} for variant {}, remaining: {}",
-                        deductAmount,
-                        inventory.getId(),
-                        variant.getSku(),
-                        remainingQuantity
-                    );
-                }
-            }
-
-            if (remainingQuantity > 0) {
-                throw new IllegalArgumentException(
-                    "Không thể trừ đủ số lượng cho sản phẩm " + variant.getSku() + ". Vui lòng thử lại."
-                );
-            }
-        }
-
         // Tạo mã đơn hàng duy nhất
         String orderCode = generateOrderCode();
 
@@ -605,6 +538,18 @@ public class OrdersServiceImpl implements OrdersService {
             "/admin/orders/" + order.getId()
         );
 
+        // Gửi message vào Kafka để xử lý stock quantity bất đồng bộ
+        List<OrderStockProcessingMessage.StockDeductionItem> stockItems = cartItems.stream()
+            .map(cartItem -> new OrderStockProcessingMessage.StockDeductionItem(
+                cartItem.getVariantId(),
+                cartItem.getQuantity() != null ? cartItem.getQuantity().longValue() : 0L
+            ))
+            .collect(Collectors.toList());
+        
+        OrderStockProcessingMessage stockMessage = new OrderStockProcessingMessage(order.getId(), stockItems);
+        orderStockProducerService.sendStockProcessingMessage(stockMessage);
+        LOG.info("Sent stock processing message to Kafka for order: {}", order.getId());
+
         OrdersDTO dto = ordersMapper.toDto(order);
         setCanReview(dto, order);
         return dto;
@@ -694,6 +639,10 @@ public class OrdersServiceImpl implements OrdersService {
         createOrderStatusHistory(order, OrderStatus.CANCELLED, reason != null ? reason : "Đơn hàng bị hủy");
 
         order = ordersRepository.save(order);
+
+        // Restore stock cho các sản phẩm trong đơn hàng bị hủy (async)
+        orderStockRestoreService.restoreStockForCancelledOrder(order.getId());
+        LOG.info("Triggered stock restoration for cancelled order: {}", order.getId());
 
         // Gửi notification cho admin về đơn hàng bị hủy
         String customerName = order.getCustomer() != null ? 

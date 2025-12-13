@@ -185,7 +185,7 @@ public class OptionVariantServiceImpl implements OptionVariantService {
 
                 ProductVariant pv = new ProductVariant();
                 pv.setProduct(product);
-                pv.setName(buildVariantName(product.getName(), sids));
+                pv.setName(buildVariantName(product.getName(), sids, selectMap));
                 pv.setSku(generateSku(product, sids));
                 pv.setIsDefault(false);
                 pv.setPrice(BigDecimal.ZERO);
@@ -259,10 +259,17 @@ public class OptionVariantServiceImpl implements OptionVariantService {
         return sb.toString();
     }
 
-    private String buildVariantName(String productName, List<Long> selectIds) {
-        // Bạn có thể map id -> tên để hiển thị “Màu/Size…”
-        // Ở đây demo: nối id cho nhanh
-        return (productName == null ? "" : productName + " - ") + keyOf(selectIds);
+    private String buildVariantName(String productName, List<Long> selectIds, Map<Long, OptionSelect> selectMap) {
+        // Sử dụng name của option thay vì ID
+        List<String> optionNames = new ArrayList<>();
+        for (Long sid : selectIds) {
+            OptionSelect select = selectMap.get(sid);
+            if (select != null && select.getName() != null) {
+                optionNames.add(select.getName());
+            }
+        }
+        String variantSuffix = String.join(" / ", optionNames);
+        return (productName == null ? "" : productName + " - ") + variantSuffix;
     }
 
     private String generateSku(Product product, List<Long> selectIds) {

@@ -282,4 +282,43 @@ public class FlashSaleProductServiceImpl implements FlashSaleProductService {
             .map(flashSaleProductMapper::toDto)
             .collect(Collectors.toList());
     }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<FlashSaleProductDTO> findAllSortedByDiscountPercent() {
+        LOG.debug("Request to get all FlashSaleProducts sorted by discount percentage");
+        return flashSaleProductRepository
+            .findAllWithToOneRelationships()
+            .stream()
+            .map(flashSaleProductMapper::toDto)
+            .sorted((a, b) -> {
+                // Tính phần trăm giảm giá cho sản phẩm a
+                BigDecimal originalPriceA = a.getProductVariant() != null && a.getProductVariant().getPrice() != null
+                    ? a.getProductVariant().getPrice()
+                    : BigDecimal.ZERO;
+                BigDecimal salePriceA = a.getSalePrice() != null ? a.getSalePrice() : BigDecimal.ZERO;
+                BigDecimal discountPercentA = BigDecimal.ZERO;
+                if (originalPriceA.compareTo(BigDecimal.ZERO) > 0) {
+                    discountPercentA = originalPriceA.subtract(salePriceA)
+                        .divide(originalPriceA, 4, java.math.RoundingMode.HALF_UP)
+                        .multiply(BigDecimal.valueOf(100));
+                }
+
+                // Tính phần trăm giảm giá cho sản phẩm b
+                BigDecimal originalPriceB = b.getProductVariant() != null && b.getProductVariant().getPrice() != null
+                    ? b.getProductVariant().getPrice()
+                    : BigDecimal.ZERO;
+                BigDecimal salePriceB = b.getSalePrice() != null ? b.getSalePrice() : BigDecimal.ZERO;
+                BigDecimal discountPercentB = BigDecimal.ZERO;
+                if (originalPriceB.compareTo(BigDecimal.ZERO) > 0) {
+                    discountPercentB = originalPriceB.subtract(salePriceB)
+                        .divide(originalPriceB, 4, java.math.RoundingMode.HALF_UP)
+                        .multiply(BigDecimal.valueOf(100));
+                }
+
+                // Sắp xếp giảm dần (giảm nhiều nhất lên trên)
+                return discountPercentB.compareTo(discountPercentA);
+            })
+            .collect(Collectors.toList());
+    }
 }

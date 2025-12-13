@@ -31,9 +31,16 @@ public class ProductVariantQueryService extends QueryService<ProductVariant> {
 
     private final ProductVariantMapper productVariantMapper;
 
-    public ProductVariantQueryService(ProductVariantRepository productVariantRepository, ProductVariantMapper productVariantMapper) {
+    private final FlashSaleProductService flashSaleProductService;
+
+    public ProductVariantQueryService(
+        ProductVariantRepository productVariantRepository,
+        ProductVariantMapper productVariantMapper,
+        FlashSaleProductService flashSaleProductService
+    ) {
         this.productVariantRepository = productVariantRepository;
         this.productVariantMapper = productVariantMapper;
+        this.flashSaleProductService = flashSaleProductService;
     }
 
     /**
@@ -45,7 +52,17 @@ public class ProductVariantQueryService extends QueryService<ProductVariant> {
     public List<ProductVariantDTO> findByCriteria(ProductVariantCriteria criteria) {
         LOG.debug("find by criteria : {}", criteria);
         final Specification<ProductVariant> specification = createSpecification(criteria);
-        return productVariantMapper.toDto(productVariantRepository.findAll(specification));
+        List<ProductVariantDTO> result = productVariantMapper.toDto(productVariantRepository.findAll(specification));
+        // Set promotionPrice từ FlashSaleProduct cho mỗi variant
+        result.forEach(dto -> {
+            if (dto.getId() != null) {
+                flashSaleProductService.findActiveByProductVariantId(dto.getId())
+                    .ifPresent(flashSaleProduct -> {
+                        dto.setPromotionPrice(flashSaleProduct.getSalePrice());
+                    });
+            }
+        });
+        return result;
     }
 
     /**
