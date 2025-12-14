@@ -9,7 +9,6 @@ import lombok.Getter;
 import lombok.Setter;
 
 import java.io.Serializable;
-import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.Objects;
@@ -64,10 +63,6 @@ public class ProductDTO implements Serializable {
     private Set<CollectionDTO> collections = new HashSet<>();
 
     private Set<CustomerDTO> wishlistedBies = new HashSet<>();
-
-    private BigDecimal price;
-
-    private BigDecimal promotionPrice;
 
     @Override
     public boolean equals(Object o) {

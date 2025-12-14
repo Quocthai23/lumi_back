@@ -6,7 +6,6 @@ import com.lumiere.app.domain.ProductAttachment;
 import com.lumiere.app.domain.ProductAttachmentId;
 import com.lumiere.app.domain.ProductVariant;
 import com.lumiere.app.repository.AttachmentRepository;
-import com.lumiere.app.repository.FlashSaleProductRepository;
 import com.lumiere.app.repository.ProductAttachmentRepository;
 import com.lumiere.app.repository.ProductRepository;
 import com.lumiere.app.repository.ProductVariantRepository;
@@ -51,9 +50,8 @@ public class ProductServiceImpl implements ProductService {
     private final ProductAttachmentRepository productAttachmentRepository;
     private final AttachmentMapper attachmentMapper;
     private final ProductVariantRepository productVariantRepository;
-    private final FlashSaleProductRepository flashSaleProductRepository;
 
-    public ProductServiceImpl(ProductRepository productRepository, ProductMapper productMapper, AttachmentService attachmentService, AttachmentRepository attachmentRepository, ProductAttachmentRepository productAttachmentRepository, AttachmentMapper attachmentMapper, ProductVariantRepository productVariantRepository, FlashSaleProductRepository flashSaleProductRepository) {
+    public ProductServiceImpl(ProductRepository productRepository, ProductMapper productMapper, AttachmentService attachmentService, AttachmentRepository attachmentRepository, ProductAttachmentRepository productAttachmentRepository, AttachmentMapper attachmentMapper, ProductVariantRepository productVariantRepository) {
         this.productRepository = productRepository;
         this.productMapper = productMapper;
         this.attachmentService = attachmentService;
@@ -61,7 +59,6 @@ public class ProductServiceImpl implements ProductService {
         this.productAttachmentRepository = productAttachmentRepository;
         this.attachmentMapper = attachmentMapper;
         this.productVariantRepository = productVariantRepository;
-        this.flashSaleProductRepository = flashSaleProductRepository;
     }
 
     @Override
@@ -293,31 +290,6 @@ public class ProductServiceImpl implements ProductService {
         List<ProductDTO> dtos = products.stream()
             .map(productMapper::toDto)
             .toList();
-
-        // Lấy giá rẻ nhất của variant cho mỗi product
-        Map<Long, BigDecimal> minPriceMap = new HashMap<>();
-        List<Object[]> minPriceResults = productVariantRepository.findMinPriceByProductIds(ids);
-        for (Object[] result : minPriceResults) {
-            Long productId = ((Number) result[0]).longValue();
-            BigDecimal variantMinPrice = (BigDecimal) result[1];
-            minPriceMap.put(productId, variantMinPrice);
-        }
-
-        // Lấy giá flashsale rẻ nhất của mỗi product (chỉ flashsale đang active)
-        Map<Long, BigDecimal> minFlashSalePriceMap = new HashMap<>();
-        Instant now = Instant.now();
-        List<Object[]> minFlashSalePriceResults = flashSaleProductRepository.findMinFlashSalePriceByProductIds(ids, now);
-        for (Object[] result : minFlashSalePriceResults) {
-            Long productId = ((Number) result[0]).longValue();
-            BigDecimal minFlashSalePrice = (BigDecimal) result[1];
-            minFlashSalePriceMap.put(productId, minFlashSalePrice);
-        }
-
-        // Set price và promotionPrice cho mỗi DTO
-        for (ProductDTO dto : dtos) {
-            dto.setPrice(minPriceMap.get(dto.getId()));
-            dto.setPromotionPrice(minFlashSalePriceMap.get(dto.getId()));
-        }
 
         return new PageImpl<>(dtos, pageable, idPage.getTotalElements());
     }

@@ -23,14 +23,11 @@ public interface ProductRepository extends JpaRepository<Product, Long>, JpaSpec
             WHERE (:categoryIds IS NULL OR p.categoryId IN :categoryIds)
               AND (
                 :minPrice IS NULL OR
-                (SELECT MIN(v.price) FROM ProductVariant v WHERE v.product = p AND v.price > 0) >= :minPrice
+                (SELECT MIN(v.price) FROM ProductVariant v WHERE v.product = p) >= :minPrice
               )
               AND (
                 :maxPrice IS NULL OR
-                (SELECT MIN(v.price) FROM ProductVariant v WHERE v.product = p AND v.price > 0) <= :maxPrice
-              )
-              AND EXISTS (
-                SELECT 1 FROM ProductVariant v WHERE v.product = p AND v.price > 0
+                (SELECT MIN(v.price) FROM ProductVariant v WHERE v.product = p) <= :maxPrice
               )
         """,
         countQuery = """
@@ -39,14 +36,11 @@ public interface ProductRepository extends JpaRepository<Product, Long>, JpaSpec
             WHERE (:categoryIds IS NULL OR p.categoryId IN :categoryIds)
               AND (
                 :minPrice IS NULL OR
-                (SELECT MIN(v.price) FROM ProductVariant v WHERE v.product = p AND v.price > 0) >= :minPrice
+                (SELECT MIN(v.price) FROM ProductVariant v WHERE v.product = p) >= :minPrice
               )
               AND (
                 :maxPrice IS NULL OR
-                (SELECT MIN(v.price) FROM ProductVariant v WHERE v.product = p AND v.price > 0) <= :maxPrice
-              )
-              AND EXISTS (
-                SELECT 1 FROM ProductVariant v WHERE v.product = p AND v.price > 0
+                (SELECT MIN(v.price) FROM ProductVariant v WHERE v.product = p) <= :maxPrice
               )
         """
     )

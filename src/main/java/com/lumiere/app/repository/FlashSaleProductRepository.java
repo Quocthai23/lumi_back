@@ -1,7 +1,6 @@
 package com.lumiere.app.repository;
 
 import com.lumiere.app.domain.FlashSaleProduct;
-import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
@@ -97,21 +96,4 @@ public interface FlashSaleProductRepository extends JpaRepository<FlashSaleProdu
         "where flashSaleProduct.quantity > flashSaleProduct.sold"
     )
     List<FlashSaleProduct> findAvailableProducts();
-
-    /**
-     * Lấy giá flashsale rẻ nhất của mỗi product (chỉ flashsale đang active)
-     */
-    @Query("""
-        SELECT fsp.productVariant.product.id, MIN(fsp.salePrice)
-        FROM FlashSaleProduct fsp
-        WHERE fsp.productVariant.product.id IN :productIds
-          AND fsp.flashSale.startTime <= :now
-          AND fsp.flashSale.endTime >= :now
-          AND fsp.quantity > fsp.sold
-        GROUP BY fsp.productVariant.product.id
-        """)
-    List<Object[]> findMinFlashSalePriceByProductIds(
-        @Param("productIds") List<Long> productIds,
-        @Param("now") Instant now
-    );
 }
