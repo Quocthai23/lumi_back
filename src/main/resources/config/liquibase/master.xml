@@ -59,4 +59,5 @@
     <include file="config/liquibase/changelog/20250115000001_add_contact_message_to_chat_message.xml" relativeToChangelogFile="false"/>
     <include file="config/liquibase/changelog/20250101000000_add_shipping_info_to_orders.xml" relativeToChangelogFile="false"/>
     <include file="config/liquibase/changelog/20250101000001_update_flash_sale_product_to_product_variant.xml" relativeToChangelogFile="false"/>
+    <include file="config/liquibase/changelog/20250116000000_add_reply_to_product_review.xml" relativeToChangelogFile="false"/>
 </databaseChangeLog>

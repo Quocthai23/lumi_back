@@ -49,6 +49,10 @@ public class ProductReview implements Serializable {
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
+    @Lob
+    @Column(name = "reply")
+    private String reply;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JsonIgnoreProperties(value = { "variants", "reviews", "questions", "collections", "wishlistedBies" }, allowSetters = true)
     private Product product;
@@ -133,6 +137,19 @@ public class ProductReview implements Serializable {
         this.createdAt = createdAt;
     }
 
+    public String getReply() {
+        return this.reply;
+    }
+
+    public ProductReview reply(String reply) {
+        this.setReply(reply);
+        return this;
+    }
+
+    public void setReply(String reply) {
+        this.reply = reply;
+    }
+
     public Product getProduct() {
         return this.product;
     }
@@ -175,6 +192,7 @@ public class ProductReview implements Serializable {
             ", comment='" + getComment() + "'" +
             ", status='" + getStatus() + "'" +
             ", createdAt='" + getCreatedAt() + "'" +
+            ", reply='" + getReply() + "'" +
             "}";
     }
 }

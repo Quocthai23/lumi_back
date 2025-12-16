@@ -1266,4 +1266,160 @@ public class OrdersServiceImpl implements OrdersService {
                 return null;
         }
     }
+
+    @Override
+    @Transactional
+    public OrdersDTO createGuestOrder(
+        List<com.lumiere.app.service.dto.GuestCartItemDTO> cartItems,
+        String paymentMethod,
+        String note,
+        Integer redeemedPoints,
+        String voucherCode,
+        BigDecimal shippingCost,
+        String shippingInfo
+    ) {
+        LOG.debug("Request to create guest order with {} items", cartItems.size());
+
+        if (cartItems == null || cartItems.isEmpty()) {
+            throw new IllegalArgumentException("Cart is empty");
+        }
+
+        // Tạo mã đơn hàng duy nhất
+        String orderCode = generateOrderCode();
+
+        // Tính tổng tiền sản phẩm
+        BigDecimal subtotal = BigDecimal.ZERO;
+        for (com.lumiere.app.service.dto.GuestCartItemDTO cartItem : cartItems) {
+            if (cartItem.getTotalPrice() != null) {
+                subtotal = subtotal.add(cartItem.getTotalPrice());
+            } else if (cartItem.getUnitPrice() != null && cartItem.getQuantity() != null) {
+                BigDecimal itemTotal = cartItem.getUnitPrice().multiply(BigDecimal.valueOf(cartItem.getQuantity()));
+                subtotal = subtotal.add(itemTotal);
+            }
+        }
+
+        // Tính phí vận chuyển (guest users không có tier, mặc định 40,000 VND)
+        BigDecimal shippingFee = shippingCost != null ? shippingCost : BigDecimal.valueOf(40000);
+
+        // Giảm giá ship 10k nếu paymentMethod là QR
+        if (paymentMethod != null && paymentMethod.trim().equalsIgnoreCase("QR")) {
+            BigDecimal qrDiscount = BigDecimal.valueOf(10000);
+            if (shippingFee.compareTo(qrDiscount) >= 0) {
+                shippingFee = shippingFee.subtract(qrDiscount);
+                LOG.debug("QR payment method: Shipping fee reduced by 10,000 VND. New shipping fee: {}", shippingFee);
+            } else {
+                shippingFee = BigDecimal.ZERO;
+                LOG.debug("QR payment method: Shipping fee reduced to 0 VND");
+            }
+        }
+
+        // Tính tổng tiền (subtotal + shipping fee)
+        BigDecimal totalAmount = subtotal.add(shippingFee);
+
+        BigDecimal discountAmount = BigDecimal.ZERO;
+        Voucher voucher = null;
+
+        // Xử lý voucher nếu có
+        if (voucherCode != null && !voucherCode.trim().isEmpty()) {
+            try {
+                // Validate voucher
+                voucher = voucherService.validateVoucher(voucherCode, totalAmount);
+
+                // Tính số tiền giảm giá
+                discountAmount = voucherService.calculateDiscountAmount(voucher, totalAmount);
+
+                // Trừ số tiền giảm giá từ tổng tiền
+                totalAmount = totalAmount.subtract(discountAmount);
+                if (totalAmount.compareTo(BigDecimal.ZERO) < 0) {
+                    totalAmount = BigDecimal.ZERO;
+                }
+
+                LOG.debug("Applied voucher: {}, discount amount: {}", voucherCode, discountAmount);
+            } catch (IllegalArgumentException e) {
+                throw new IllegalArgumentException("Lỗi voucher: " + e.getMessage());
+            }
+        }
+
+        // Guest users không có điểm tích lũy
+        if (redeemedPoints != null && redeemedPoints > 0) {
+            LOG.warn("Guest user cannot use loyalty points, ignoring redeemedPoints: {}", redeemedPoints);
+            redeemedPoints = 0;
+        }
+
+        // Tạo đơn hàng (không có customer)
+        Orders order = new Orders();
+        order.setCode(orderCode);
+        order.setStatus(OrderStatus.PENDING);
+        order.setPaymentStatus(PaymentStatus.UNPAID);
+        order.setTotalAmount(totalAmount);
+        order.setNote(note);
+        order.setPaymentMethod(paymentMethod);
+        order.setPlacedAt(Instant.now());
+        order.setRedeemedPoints(0);
+        order.setDiscountAmount(discountAmount);
+        order.setShippingCost(shippingFee);
+        order.setShippingInfo(shippingInfo);
+        order.setVoucher(voucher);
+        order.setCustomer(null); // Guest order không có customer
+
+        order = ordersRepository.save(order);
+
+        // Áp dụng voucher (tăng usage count) sau khi đơn hàng được tạo thành công
+        if (voucher != null) {
+            voucherService.applyVoucher(voucher);
+            // Guest order không có customer nên không mark voucher as used
+        }
+
+        // Tạo OrderItems từ GuestCartItemDTO
+        for (com.lumiere.app.service.dto.GuestCartItemDTO cartItem : cartItems) {
+            ProductVariant variant = productVariantRepository.findById(cartItem.getVariantId())
+                .orElseThrow(() -> new IllegalArgumentException("Product variant not found: " + cartItem.getVariantId()));
+
+            OrderItem orderItem = new OrderItem();
+            orderItem.setOrder(order);
+            orderItem.setProductVariant(variant);
+            orderItem.setQuantity(cartItem.getQuantity());
+            
+            // Sử dụng unitPrice từ cartItem hoặc lấy từ variant
+            BigDecimal unitPrice = cartItem.getUnitPrice();
+            if (unitPrice == null) {
+                unitPrice = variant.getPrice() != null ? variant.getPrice() : BigDecimal.ZERO;
+            }
+            orderItem.setUnitPrice(unitPrice);
+            
+            // Tính totalPrice
+            BigDecimal itemTotalPrice = unitPrice.multiply(BigDecimal.valueOf(cartItem.getQuantity()));
+            orderItem.setTotalPrice(itemTotalPrice);
+
+            orderItemRepository.save(orderItem);
+        }
+
+        // Tạo lịch sử trạng thái
+        createOrderStatusHistory(order, OrderStatus.PENDING, "Đơn hàng được tạo bởi khách vãng lai");
+
+        // Gửi notification cho admin về đơn hàng mới
+        String adminMessage = String.format("Có đơn hàng mới #%s từ khách vãng lai với tổng tiền %s VND", 
+            orderCode, totalAmount);
+        notificationProducerService.sendAdminNotification(
+            NotificationType.NEW_ORDER,
+            adminMessage,
+            "/admin/orders/" + order.getId()
+        );
+
+        // Gửi message vào Kafka để xử lý stock quantity bất đồng bộ
+        List<OrderStockProcessingMessage.StockDeductionItem> stockItems = cartItems.stream()
+            .map(cartItem -> new OrderStockProcessingMessage.StockDeductionItem(
+                cartItem.getVariantId(),
+                cartItem.getQuantity() != null ? cartItem.getQuantity().longValue() : 0L
+            ))
+            .collect(Collectors.toList());
+        
+        OrderStockProcessingMessage stockMessage = new OrderStockProcessingMessage(order.getId(), stockItems);
+        orderStockProducerService.sendStockProcessingMessage(stockMessage);
+        LOG.info("Sent stock processing message to Kafka for guest order: {}", order.getId());
+
+        OrdersDTO dto = ordersMapper.toDto(order);
+        setCanReview(dto, order);
+        return dto;
+    }
 }

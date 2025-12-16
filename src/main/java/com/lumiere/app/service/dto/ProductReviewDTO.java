@@ -33,6 +33,9 @@ public class ProductReviewDTO implements Serializable {
     @NotNull
     private Instant createdAt;
 
+    @Lob
+    private String reply;
+
     private ProductDTO product;
 
     public Long getId() {
@@ -83,6 +86,14 @@ public class ProductReviewDTO implements Serializable {
         this.createdAt = createdAt;
     }
 
+    public String getReply() {
+        return reply;
+    }
+
+    public void setReply(String reply) {
+        this.reply = reply;
+    }
+
     public ProductDTO getProduct() {
         return product;
     }
@@ -122,6 +133,7 @@ public class ProductReviewDTO implements Serializable {
             ", comment='" + getComment() + "'" +
             ", status='" + getStatus() + "'" +
             ", createdAt='" + getCreatedAt() + "'" +
+            ", reply='" + getReply() + "'" +
             ", product=" + getProduct() +
             "}";
     }

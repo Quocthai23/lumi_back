@@ -56,6 +56,23 @@ public class SecurityConfiguration {
                     .requestMatchers(mvc.pattern("/api/activate")).permitAll()
                     .requestMatchers(mvc.pattern("/api/account/reset-password/init")).permitAll()
                     .requestMatchers(mvc.pattern("/api/account/reset-password/finish")).permitAll()
+                    .requestMatchers(mvc.pattern(HttpMethod.POST, "/api/orders/create-guest-order")).permitAll()
+                    // Product APIs - cho phép khách vãng lai xem sản phẩm
+                    .requestMatchers(mvc.pattern(HttpMethod.GET, "/api/products/search")).permitAll()
+                    .requestMatchers(mvc.pattern(HttpMethod.GET, "/api/products/{id}")).permitAll()
+                    .requestMatchers(mvc.pattern(HttpMethod.GET, "/api/products/{id}/images-map")).permitAll()
+                    .requestMatchers(mvc.pattern(HttpMethod.GET, "/api/products")).permitAll()
+                    // Product Variant APIs - cho phép khách vãng lai xem variants
+                    .requestMatchers(mvc.pattern(HttpMethod.GET, "/api/product-variants")).permitAll()
+                    .requestMatchers(mvc.pattern(HttpMethod.GET, "/api/product-variants/by-product-ids")).permitAll()
+                    .requestMatchers(mvc.pattern(HttpMethod.GET, "/api/product-variants/{id}")).permitAll()
+                    // Product Review APIs - cho phép khách vãng lai xem đánh giá
+                    .requestMatchers(mvc.pattern(HttpMethod.GET, "/api/product-reviews/by-product/{productId}")).permitAll()
+                    // Home APIs - cho phép khách vãng lai xem trang chủ
+                    .requestMatchers(mvc.pattern(HttpMethod.GET, "/api/home/**")).permitAll()
+                    // Flash Sale APIs - cho phép khách vãng lai xem flash sale
+                    .requestMatchers(mvc.pattern(HttpMethod.GET, "/api/flash-sales/**")).permitAll()
+                    .requestMatchers(mvc.pattern(HttpMethod.GET, "/api/flash-sale-products/**")).permitAll()
                     .requestMatchers(mvc.pattern("/api/admin/**")).hasAuthority(AuthoritiesConstants.ADMIN)
                     .requestMatchers(mvc.pattern("/api/**")).authenticated()
                     .requestMatchers(mvc.pattern("/v3/api-docs/**")).hasAuthority(AuthoritiesConstants.ADMIN)

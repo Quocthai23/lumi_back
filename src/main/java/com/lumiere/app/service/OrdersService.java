@@ -202,4 +202,26 @@ public interface OrdersService {
         com.lumiere.app.domain.enumeration.OrderStatus currentStatus,
         com.lumiere.app.domain.enumeration.PaymentStatus paymentStatus
     );
+
+    /**
+     * Tạo đơn hàng cho khách vãng lai (không cần đăng nhập).
+     *
+     * @param cartItems danh sách sản phẩm trong giỏ hàng
+     * @param paymentMethod phương thức thanh toán
+     * @param note ghi chú đơn hàng
+     * @param redeemedPoints điểm tích lũy sử dụng (0 cho guest)
+     * @param voucherCode mã voucher (tùy chọn)
+     * @param shippingCost phí vận chuyển
+     * @param shippingInfo thông tin giao hàng
+     * @return đơn hàng đã tạo
+     */
+    OrdersDTO createGuestOrder(
+        List<com.lumiere.app.service.dto.GuestCartItemDTO> cartItems,
+        String paymentMethod,
+        String note,
+        Integer redeemedPoints,
+        String voucherCode,
+        java.math.BigDecimal shippingCost,
+        String shippingInfo
+    );
 }

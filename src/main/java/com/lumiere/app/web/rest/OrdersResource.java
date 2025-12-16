@@ -251,6 +251,27 @@ public class OrdersResource {
     }
 
     /**
+     * {@code POST  /orders/create-guest-order} : Tạo đơn hàng cho khách vãng lai (không cần đăng nhập).
+     *
+     * @param request thông tin tạo đơn hàng từ guest
+     * @return the {@link ResponseEntity} with status {@code 201 (Created)} and with body the new ordersDTO.
+     */
+    @PostMapping("/create-guest-order")
+    public ResponseEntity<OrdersDTO> createGuestOrder(@Valid @RequestBody CreateGuestOrderRequest request) {
+        LOG.debug("REST request to create guest order: {}", request);
+        OrdersDTO ordersDTO = ordersService.createGuestOrder(
+            request.getCartItems(),
+            request.getPaymentMethod(),
+            request.getNote(),
+            request.getRedeemedPoints(),
+            request.getVoucherCode(),
+            request.getShippingFee(),
+            request.getShippingInfo()
+        );
+        return ResponseEntity.ok().body(ordersDTO);
+    }
+
+    /**
      * {@code PUT  /orders/{id}/status} : Cập nhật trạng thái đơn hàng.
      *
      * @param id ID đơn hàng
@@ -519,6 +540,75 @@ public class OrdersResource {
 
         public void setReason(String reason) {
             this.reason = reason;
+        }
+    }
+
+    /**
+     * Request DTO cho tạo đơn hàng từ khách vãng lai.
+     */
+    public static class CreateGuestOrderRequest {
+        private java.util.List<com.lumiere.app.service.dto.GuestCartItemDTO> cartItems;
+        private String paymentMethod;
+        private String note;
+        private Integer redeemedPoints;
+        private String voucherCode;
+        private java.math.BigDecimal shippingFee;
+        private String shippingInfo;
+
+        public java.util.List<com.lumiere.app.service.dto.GuestCartItemDTO> getCartItems() {
+            return cartItems;
+        }
+
+        public void setCartItems(java.util.List<com.lumiere.app.service.dto.GuestCartItemDTO> cartItems) {
+            this.cartItems = cartItems;
+        }
+
+        public String getPaymentMethod() {
+            return paymentMethod;
+        }
+
+        public void setPaymentMethod(String paymentMethod) {
+            this.paymentMethod = paymentMethod;
+        }
+
+        public String getNote() {
+            return note;
+        }
+
+        public void setNote(String note) {
+            this.note = note;
+        }
+
+        public Integer getRedeemedPoints() {
+            return redeemedPoints;
+        }
+
+        public void setRedeemedPoints(Integer redeemedPoints) {
+            this.redeemedPoints = redeemedPoints;
+        }
+
+        public String getVoucherCode() {
+            return voucherCode;
+        }
+
+        public void setVoucherCode(String voucherCode) {
+            this.voucherCode = voucherCode;
+        }
+
+        public java.math.BigDecimal getShippingFee() {
+            return shippingFee;
+        }
+
+        public void setShippingFee(java.math.BigDecimal shippingFee) {
+            this.shippingFee = shippingFee;
+        }
+
+        public String getShippingInfo() {
+            return shippingInfo;
+        }
+
+        public void setShippingInfo(String shippingInfo) {
+            this.shippingInfo = shippingInfo;
         }
     }
 }
