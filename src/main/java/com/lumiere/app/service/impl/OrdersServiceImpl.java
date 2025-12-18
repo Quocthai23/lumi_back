@@ -34,6 +34,7 @@ import java.util.stream.Collectors;
 
 import com.lumiere.app.service.mapper.ProductMapper;
 import com.lumiere.app.service.mapper.ProductVariantMapper;
+import com.lumiere.app.service.FlashSaleProductService;
 import com.lumiere.app.utils.RatingUtils;
 import jakarta.servlet.ServletOutputStream;
 import jakarta.servlet.http.HttpServletResponse;
@@ -83,6 +84,7 @@ public class OrdersServiceImpl implements OrdersService {
     private final NotificationProducerService notificationProducerService;
     private final OrderStockProducerService orderStockProducerService;
     private final OrderStockRestoreService orderStockRestoreService;
+    private final FlashSaleProductService flashSaleProductService;
 
     public OrdersServiceImpl(
         OrdersRepository ordersRepository,
@@ -106,7 +108,8 @@ public class OrdersServiceImpl implements OrdersService {
         InventoryRepository inventoryRepository, ProductMapper productMapper, ProductService productService,
         NotificationProducerService notificationProducerService,
         OrderStockProducerService orderStockProducerService,
-        OrderStockRestoreService orderStockRestoreService) {
+        OrderStockRestoreService orderStockRestoreService,
+        FlashSaleProductService flashSaleProductService) {
         this.ordersRepository = ordersRepository;
         this.ordersMapper = ordersMapper;
         this.customerService = customerService;
@@ -131,6 +134,7 @@ public class OrdersServiceImpl implements OrdersService {
         this.notificationProducerService = notificationProducerService;
         this.orderStockProducerService = orderStockProducerService;
         this.orderStockRestoreService = orderStockRestoreService;
+        this.flashSaleProductService = flashSaleProductService;
     }
 
     @Override
@@ -359,6 +363,167 @@ public class OrdersServiceImpl implements OrdersService {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public void exportOrdersToExcel(HttpServletResponse response) {
+        LOG.debug("Request to export all orders to Excel");
+        
+        // Lấy tất cả đơn hàng
+        List<Orders> orders = ordersRepository.findAllWithToOneRelationships();
+        List<OrdersDTO> ordersDTO = orders.stream()
+            .map(ordersMapper::toDto)
+            .collect(Collectors.toList());
+
+        try (Workbook wb = new XSSFWorkbook()) {
+            // ====== Styles ======
+            Font fTitle = wb.createFont();
+            fTitle.setBold(true);
+            fTitle.setFontHeightInPoints((short) 16);
+            CellStyle sTitle = wb.createCellStyle();
+            sTitle.setFont(fTitle);
+
+            Font fHdr = wb.createFont();
+            fHdr.setBold(true);
+            CellStyle sHdr = wb.createCellStyle();
+            sHdr.setFont(fHdr);
+            sHdr.setFillForegroundColor(IndexedColors.GREY_25_PERCENT.getIndex());
+            sHdr.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+            setAllBorders(sHdr, BorderStyle.THIN);
+            sHdr.setAlignment(HorizontalAlignment.CENTER);
+
+            CellStyle sText = wb.createCellStyle();
+            setAllBorders(sText, BorderStyle.THIN);
+
+            CellStyle sDate = wb.createCellStyle();
+            setAllBorders(sDate, BorderStyle.THIN);
+            sDate.setDataFormat(wb.createDataFormat().getFormat("dd/MM/yyyy HH:mm"));
+
+            CellStyle sMoney = wb.createCellStyle();
+            setAllBorders(sMoney, BorderStyle.THIN);
+            sMoney.setDataFormat(wb.createDataFormat().getFormat("#,##0 \"₫\""));
+
+            Sheet sheet = wb.createSheet("Danh sách đơn hàng");
+            int r = 0;
+
+            // ===== Tiêu đề =====
+            Row titleRow = sheet.createRow(r++);
+            Cell titleCell = titleRow.createCell(0);
+            titleCell.setCellValue("DANH SÁCH ĐƠN HÀNG");
+            titleCell.setCellStyle(sTitle);
+            sheet.addMergedRegion(new org.apache.poi.ss.util.CellRangeAddress(0, 0, 0, 7));
+
+            r++; // Dòng trống
+
+            // ===== Header bảng =====
+            Row headerRow = sheet.createRow(r++);
+            String[] headers = {
+                "Mã Đơn Hàng",
+                "Ngày Đặt",
+                "Khách Hàng",
+                "Trạng Thái",
+                "Thanh Toán",
+                "Phương Thức Thanh Toán",
+                "Tổng Tiền",
+                "Ghi Chú"
+            };
+            
+            for (int i = 0; i < headers.length; i++) {
+                Cell cell = headerRow.createCell(i);
+                cell.setCellValue(headers[i]);
+                cell.setCellStyle(sHdr);
+            }
+
+            // ===== Dữ liệu đơn hàng =====
+            for (OrdersDTO order : ordersDTO) {
+                Row row = sheet.createRow(r++);
+                
+                // Mã đơn hàng
+                Cell cell0 = row.createCell(0);
+                cell0.setCellValue(safe(order.getCode()));
+                cell0.setCellStyle(sText);
+                
+                // Ngày đặt
+                Cell cell1 = row.createCell(1);
+                if (order.getPlacedAt() != null) {
+                    cell1.setCellValue(order.getPlacedAt().atZone(ZoneId.systemDefault()).toLocalDateTime());
+                    cell1.setCellStyle(sDate);
+                } else {
+                    cell1.setCellValue("");
+                    cell1.setCellStyle(sText);
+                }
+                
+                // Khách hàng
+                Cell cell2 = row.createCell(2);
+                String customerName = "Khách vãng lai";
+                if (order.getCustomer() != null) {
+                    try {
+                        String firstName = safe((String) order.getCustomer().getClass().getMethod("getFirstName").invoke(order.getCustomer()));
+                        String lastName = safe((String) order.getCustomer().getClass().getMethod("getLastName").invoke(order.getCustomer()));
+                        customerName = (firstName + " " + lastName).trim();
+                        if (customerName.isEmpty()) {
+                            customerName = "Khách vãng lai";
+                        }
+                    } catch (Exception ignore) {
+                        customerName = "Khách vãng lai";
+                    }
+                }
+                cell2.setCellValue(customerName);
+                cell2.setCellStyle(sText);
+                
+                // Trạng thái
+                Cell cell3 = row.createCell(3);
+                cell3.setCellValue(safe(order.getStatus() != null ? order.getStatus().toString() : ""));
+                cell3.setCellStyle(sText);
+                
+                // Thanh toán
+                Cell cell4 = row.createCell(4);
+                cell4.setCellValue(safe(order.getPaymentStatus() != null ? order.getPaymentStatus().toString() : ""));
+                cell4.setCellStyle(sText);
+                
+                // Phương thức thanh toán
+                Cell cell5 = row.createCell(5);
+                cell5.setCellValue(safe(order.getPaymentMethod()));
+                cell5.setCellStyle(sText);
+                
+                // Tổng tiền
+                Cell cell6 = row.createCell(6);
+                if (order.getTotalAmount() != null) {
+                    cell6.setCellValue(order.getTotalAmount().longValue());
+                    cell6.setCellStyle(sMoney);
+                } else {
+                    cell6.setCellValue(0);
+                    cell6.setCellStyle(sMoney);
+                }
+                
+                // Ghi chú
+                Cell cell7 = row.createCell(7);
+                cell7.setCellValue(safe(order.getNote()));
+                cell7.setCellStyle(sText);
+            }
+
+            // ===== Auto-fit columns =====
+            for (int i = 0; i < headers.length; i++) {
+                sheet.autoSizeColumn(i);
+                // Tăng độ rộng một chút để dễ đọc
+                sheet.setColumnWidth(i, sheet.getColumnWidth(i) + 1000);
+            }
+
+            // ===== Stream về client =====
+            String filename = URLEncoder.encode("danh_sach_don_hang_" + 
+                DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss").format(Instant.now().atZone(ZoneId.systemDefault())) + 
+                ".xlsx", StandardCharsets.UTF_8);
+            response.setHeader("Content-Disposition", "attachment; filename*=UTF-8''" + filename);
+            response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+            try (ServletOutputStream os = response.getOutputStream()) {
+                wb.write(os);
+                os.flush();
+            }
+        } catch (Exception e) {
+            LOG.error("Error exporting orders to Excel", e);
+            throw new RuntimeException("Export orders error", e);
+        }
+    }
+
+    @Override
     @Transactional
     public OrdersDTO createOrderFromCart(String paymentMethod, String note, Integer redeemedPoints, String voucherCode, BigDecimal shippingCost, String shippingInfo) {
         // Lấy userId từ SecurityContext
@@ -380,10 +545,35 @@ public class OrdersServiceImpl implements OrdersService {
         // Tạo mã đơn hàng duy nhất
         String orderCode = generateOrderCode();
 
-        // Tính tổng tiền sản phẩm
+        // Tính tổng tiền sản phẩm (có tính giá flash sale nếu có) và discount từ flash sale
         BigDecimal subtotal = BigDecimal.ZERO;
+        BigDecimal flashSaleDiscount = BigDecimal.ZERO;
         for (CartItem cartItem : cartItems) {
-            BigDecimal itemTotal = cartItem.getTotalPrice();
+            // Lấy giá gốc từ ProductVariant
+            ProductVariant variant = productVariantRepository.findById(cartItem.getVariantId())
+                .orElseThrow(() -> new IllegalArgumentException("Product variant not found: " + cartItem.getVariantId()));
+            BigDecimal originalPrice = variant.getPrice() != null ? variant.getPrice() : BigDecimal.ZERO;
+            
+            // Kiểm tra xem product variant có trong flash sale đang active không
+            BigDecimal unitPrice = originalPrice;
+            Optional<com.lumiere.app.service.dto.FlashSaleProductDTO> flashSaleProductOpt = 
+                flashSaleProductService.findActiveByProductVariantId(cartItem.getVariantId());
+            if (flashSaleProductOpt.isPresent()) {
+                com.lumiere.app.service.dto.FlashSaleProductDTO flashSaleProduct = flashSaleProductOpt.get();
+                // Nếu có flash sale, sử dụng giá flash sale
+                if (flashSaleProduct.getSalePrice() != null) {
+                    unitPrice = flashSaleProduct.getSalePrice();
+                    // Tính discount từ flash sale cho item này
+                    BigDecimal itemFlashSaleDiscount = originalPrice.subtract(unitPrice)
+                        .multiply(BigDecimal.valueOf(cartItem.getQuantity()));
+                    flashSaleDiscount = flashSaleDiscount.add(itemFlashSaleDiscount);
+                }
+                flashSaleProduct.setSold(flashSaleProduct.getSold() + cartItem.getQuantity());
+                flashSaleProductService.save(flashSaleProduct);
+            }
+            
+            // Tính tổng tiền cho item này
+            BigDecimal itemTotal = unitPrice.multiply(BigDecimal.valueOf(cartItem.getQuantity()));
             subtotal = subtotal.add(itemTotal);
         }
 
@@ -424,9 +614,11 @@ public class OrdersServiceImpl implements OrdersService {
         }
 
         // Tính tổng tiền (subtotal + shipping fee)
-        BigDecimal totalAmount = subtotal.add(shippingFee);
+        BigDecimal totalAmount = subtotal;
 
-        BigDecimal discountAmount = BigDecimal.ZERO;
+        // Discount từ flash sale được tính vào discountAmount
+        BigDecimal discountAmount = flashSaleDiscount;
+        BigDecimal voucherDiscount = BigDecimal.ZERO;
         Voucher voucher = null;
 
         // Xử lý voucher nếu có
@@ -435,19 +627,26 @@ public class OrdersServiceImpl implements OrdersService {
                 // Validate voucher
                 voucher = voucherService.validateVoucher(voucherCode, totalAmount);
 
-                // Tính số tiền giảm giá
-                discountAmount = voucherService.calculateDiscountAmount(voucher, totalAmount);
+                // Tính số tiền giảm giá từ voucher
+                voucherDiscount = voucherService.calculateDiscountAmount(voucher, totalAmount);
+                
+                // Cộng discount từ voucher vào discountAmount
+                discountAmount = discountAmount.add(voucherDiscount);
 
                 // Trừ số tiền giảm giá từ tổng tiền
-                totalAmount = totalAmount.subtract(discountAmount);
+                totalAmount = totalAmount.subtract(voucherDiscount);
                 if (totalAmount.compareTo(BigDecimal.ZERO) < 0) {
                     totalAmount = BigDecimal.ZERO;
                 }
 
-                LOG.debug("Applied voucher: {}, discount amount: {}", voucherCode, discountAmount);
+                LOG.debug("Applied voucher: {}, discount amount: {}", voucherCode, voucherDiscount);
             } catch (IllegalArgumentException e) {
                 throw new IllegalArgumentException("Lỗi voucher: " + e.getMessage());
             }
+        }
+        
+        if (flashSaleDiscount.compareTo(BigDecimal.ZERO) > 0) {
+            LOG.debug("Flash sale discount: {}", flashSaleDiscount);
         }
 
         // Trừ điểm tích lũy nếu có
@@ -485,7 +684,7 @@ public class OrdersServiceImpl implements OrdersService {
         order.setCode(orderCode);
         order.setStatus(OrderStatus.PENDING);
         order.setPaymentStatus(PaymentStatus.UNPAID);
-        order.setTotalAmount(totalAmount);
+        order.setTotalAmount(totalAmount.add(shippingCost));
         order.setNote(note);
         order.setPaymentMethod(paymentMethod);
         order.setPlacedAt(Instant.now());
@@ -510,15 +709,60 @@ public class OrdersServiceImpl implements OrdersService {
             ProductVariant variant = productVariantRepository.findById(cartItem.getVariantId())
                 .orElseThrow(() -> new IllegalArgumentException("Product variant not found: " + cartItem.getVariantId()));
 
+            // Kiểm tra xem product variant có trong flash sale đang active không
+            BigDecimal unitPrice = cartItem.getUnitPrice();
+            Optional<com.lumiere.app.service.dto.FlashSaleProductDTO> flashSaleProductOpt = 
+                flashSaleProductService.findActiveByProductVariantId(cartItem.getVariantId());
+            if (flashSaleProductOpt.isPresent()) {
+                com.lumiere.app.service.dto.FlashSaleProductDTO flashSaleProduct = flashSaleProductOpt.get();
+                // Nếu có flash sale, sử dụng giá flash sale
+                if (flashSaleProduct.getSalePrice() != null) {
+                    unitPrice = flashSaleProduct.getSalePrice();
+                }
+            }
+            
+            // Tính tổng tiền cho item này
+            BigDecimal itemTotalPrice = unitPrice.multiply(BigDecimal.valueOf(cartItem.getQuantity()));
+
             OrderItem orderItem = new OrderItem();
             orderItem.setOrder(order);
             orderItem.setProductVariant(variant);
             orderItem.setQuantity(cartItem.getQuantity());
-            orderItem.setUnitPrice(cartItem.getUnitPrice());
-            orderItem.setTotalPrice(cartItem.getTotalPrice());
+            orderItem.setUnitPrice(unitPrice);
+            orderItem.setTotalPrice(itemTotalPrice);
 
             orderItemRepository.save(orderItem);
         }
+
+        // Tính lại discount từ flash sale dựa trên OrderItems đã tạo (sau khi đã lưu)
+        BigDecimal recalculatedFlashSaleDiscount = BigDecimal.ZERO;
+        List<OrderItem> savedOrderItems = orderItemRepository.findAllByOrderId(order.getId());
+        for (OrderItem orderItem : savedOrderItems) {
+            ProductVariant variant = orderItem.getProductVariant();
+            if (variant != null && variant.getPrice() != null) {
+                BigDecimal originalPrice = variant.getPrice();
+                BigDecimal salePrice = orderItem.getUnitPrice();
+                
+                // Nếu giá bán nhỏ hơn giá gốc, có discount từ flash sale
+                if (salePrice.compareTo(originalPrice) < 0) {
+                    BigDecimal itemDiscount = originalPrice.subtract(salePrice)
+                        .multiply(BigDecimal.valueOf(orderItem.getQuantity()));
+                    recalculatedFlashSaleDiscount = recalculatedFlashSaleDiscount.add(itemDiscount);
+                }
+            }
+        }
+        
+        // Tính lại discountAmount: flash sale discount (tính lại) + voucher discount
+        BigDecimal finalDiscountAmount = recalculatedFlashSaleDiscount.add(voucherDiscount);
+        
+        // Cập nhật discountAmount vào order
+        order.setDiscountAmount(finalDiscountAmount);
+        order = ordersRepository.save(order);
+        
+        if (recalculatedFlashSaleDiscount.compareTo(BigDecimal.ZERO) > 0) {
+            LOG.debug("Recalculated flash sale discount based on OrderItems: {}", recalculatedFlashSaleDiscount);
+        }
+        LOG.debug("Final discount amount (flash sale + voucher): {}", finalDiscountAmount);
 
         // Xóa giỏ hàng
         cartItemRepository.deleteAll(cartItems);
@@ -1287,15 +1531,34 @@ public class OrdersServiceImpl implements OrdersService {
         // Tạo mã đơn hàng duy nhất
         String orderCode = generateOrderCode();
 
-        // Tính tổng tiền sản phẩm
+        // Tính tổng tiền sản phẩm (có tính giá flash sale nếu có) và discount từ flash sale
         BigDecimal subtotal = BigDecimal.ZERO;
+        BigDecimal flashSaleDiscount = BigDecimal.ZERO;
         for (com.lumiere.app.service.dto.GuestCartItemDTO cartItem : cartItems) {
-            if (cartItem.getTotalPrice() != null) {
-                subtotal = subtotal.add(cartItem.getTotalPrice());
-            } else if (cartItem.getUnitPrice() != null && cartItem.getQuantity() != null) {
-                BigDecimal itemTotal = cartItem.getUnitPrice().multiply(BigDecimal.valueOf(cartItem.getQuantity()));
-                subtotal = subtotal.add(itemTotal);
+            // Lấy giá gốc từ ProductVariant
+            ProductVariant variant = productVariantRepository.findById(cartItem.getVariantId())
+                .orElseThrow(() -> new IllegalArgumentException("Product variant not found: " + cartItem.getVariantId()));
+            BigDecimal originalPrice = variant.getPrice() != null ? variant.getPrice() : BigDecimal.ZERO;
+            
+            // Kiểm tra xem product variant có trong flash sale đang active không
+            BigDecimal unitPrice = originalPrice;
+            Optional<com.lumiere.app.service.dto.FlashSaleProductDTO> flashSaleProductOpt = 
+                flashSaleProductService.findActiveByProductVariantId(cartItem.getVariantId());
+            if (flashSaleProductOpt.isPresent()) {
+                com.lumiere.app.service.dto.FlashSaleProductDTO flashSaleProduct = flashSaleProductOpt.get();
+                // Nếu có flash sale, sử dụng giá flash sale
+                if (flashSaleProduct.getSalePrice() != null) {
+                    unitPrice = flashSaleProduct.getSalePrice();
+                    // Tính discount từ flash sale cho item này
+                    BigDecimal itemFlashSaleDiscount = originalPrice.subtract(unitPrice)
+                        .multiply(BigDecimal.valueOf(cartItem.getQuantity()));
+                    flashSaleDiscount = flashSaleDiscount.add(itemFlashSaleDiscount);
+                }
             }
+            
+            // Tính tổng tiền cho item này
+            BigDecimal itemTotal = unitPrice.multiply(BigDecimal.valueOf(cartItem.getQuantity()));
+            subtotal = subtotal.add(itemTotal);
         }
 
         // Tính phí vận chuyển (guest users không có tier, mặc định 40,000 VND)
@@ -1316,7 +1579,8 @@ public class OrdersServiceImpl implements OrdersService {
         // Tính tổng tiền (subtotal + shipping fee)
         BigDecimal totalAmount = subtotal.add(shippingFee);
 
-        BigDecimal discountAmount = BigDecimal.ZERO;
+        // Discount từ flash sale được tính vào discountAmount
+        BigDecimal discountAmount = flashSaleDiscount;
         Voucher voucher = null;
 
         // Xử lý voucher nếu có
@@ -1325,19 +1589,26 @@ public class OrdersServiceImpl implements OrdersService {
                 // Validate voucher
                 voucher = voucherService.validateVoucher(voucherCode, totalAmount);
 
-                // Tính số tiền giảm giá
-                discountAmount = voucherService.calculateDiscountAmount(voucher, totalAmount);
+                // Tính số tiền giảm giá từ voucher
+                BigDecimal voucherDiscount = voucherService.calculateDiscountAmount(voucher, totalAmount);
+                
+                // Cộng discount từ voucher vào discountAmount
+                discountAmount = discountAmount.add(voucherDiscount);
 
                 // Trừ số tiền giảm giá từ tổng tiền
-                totalAmount = totalAmount.subtract(discountAmount);
+                totalAmount = totalAmount.subtract(voucherDiscount);
                 if (totalAmount.compareTo(BigDecimal.ZERO) < 0) {
                     totalAmount = BigDecimal.ZERO;
                 }
 
-                LOG.debug("Applied voucher: {}, discount amount: {}", voucherCode, discountAmount);
+                LOG.debug("Applied voucher: {}, discount amount: {}", voucherCode, voucherDiscount);
             } catch (IllegalArgumentException e) {
                 throw new IllegalArgumentException("Lỗi voucher: " + e.getMessage());
             }
+        }
+        
+        if (flashSaleDiscount.compareTo(BigDecimal.ZERO) > 0) {
+            LOG.debug("Flash sale discount: {}", flashSaleDiscount);
         }
 
         // Guest users không có điểm tích lũy
@@ -1375,20 +1646,31 @@ public class OrdersServiceImpl implements OrdersService {
             ProductVariant variant = productVariantRepository.findById(cartItem.getVariantId())
                 .orElseThrow(() -> new IllegalArgumentException("Product variant not found: " + cartItem.getVariantId()));
 
-            OrderItem orderItem = new OrderItem();
-            orderItem.setOrder(order);
-            orderItem.setProductVariant(variant);
-            orderItem.setQuantity(cartItem.getQuantity());
-            
             // Sử dụng unitPrice từ cartItem hoặc lấy từ variant
             BigDecimal unitPrice = cartItem.getUnitPrice();
             if (unitPrice == null) {
                 unitPrice = variant.getPrice() != null ? variant.getPrice() : BigDecimal.ZERO;
             }
-            orderItem.setUnitPrice(unitPrice);
+            
+            // Kiểm tra xem product variant có trong flash sale đang active không
+            Optional<com.lumiere.app.service.dto.FlashSaleProductDTO> flashSaleProductOpt = 
+                flashSaleProductService.findActiveByProductVariantId(cartItem.getVariantId());
+            if (flashSaleProductOpt.isPresent()) {
+                com.lumiere.app.service.dto.FlashSaleProductDTO flashSaleProduct = flashSaleProductOpt.get();
+                // Nếu có flash sale, sử dụng giá flash sale
+                if (flashSaleProduct.getSalePrice() != null) {
+                    unitPrice = flashSaleProduct.getSalePrice();
+                }
+            }
             
             // Tính totalPrice
             BigDecimal itemTotalPrice = unitPrice.multiply(BigDecimal.valueOf(cartItem.getQuantity()));
+
+            OrderItem orderItem = new OrderItem();
+            orderItem.setOrder(order);
+            orderItem.setProductVariant(variant);
+            orderItem.setQuantity(cartItem.getQuantity());
+            orderItem.setUnitPrice(unitPrice);
             orderItem.setTotalPrice(itemTotalPrice);
 
             orderItemRepository.save(orderItem);

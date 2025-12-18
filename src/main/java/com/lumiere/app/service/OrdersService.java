@@ -62,6 +62,13 @@ public interface OrdersService {
     void writeOrderInvoiceExcel(Long orderId, HttpServletResponse response);
 
     /**
+     * Xuất Excel danh sách đơn hàng.
+     *
+     * @param response HTTP response để ghi file Excel
+     */
+    void exportOrdersToExcel(HttpServletResponse response);
+
+    /**
      * Tạo đơn hàng từ giỏ hàng của khách hàng hiện tại.
      *
      * @param paymentMethod phương thức thanh toán

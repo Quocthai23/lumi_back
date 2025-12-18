@@ -5,6 +5,7 @@ import com.lumiere.app.domain.ProductVariant;
 import com.lumiere.app.repository.CartItemRepository;
 import com.lumiere.app.repository.ProductVariantRepository;
 import com.lumiere.app.service.CartItemService;
+import com.lumiere.app.service.FlashSaleProductService;
 import com.lumiere.app.service.dto.CartItemDTO;
 import com.lumiere.app.service.dto.ProductVariantDTO;
 import com.lumiere.app.service.mapper.CartItemMapper;
@@ -33,12 +34,20 @@ public class CartItemServiceImpl implements CartItemService {
     private final CartItemMapper cartItemMapper;
     private final ProductVariantRepository productVariantRepository;
     private final ProductVariantMapper productVariantMapper;
+    private final FlashSaleProductService flashSaleProductService;
 
-    public CartItemServiceImpl(CartItemRepository cartItemRepository, CartItemMapper cartItemMapper, ProductVariantRepository productVariantRepository, ProductVariantMapper productVariantMapper) {
+    public CartItemServiceImpl(
+        CartItemRepository cartItemRepository, 
+        CartItemMapper cartItemMapper, 
+        ProductVariantRepository productVariantRepository, 
+        ProductVariantMapper productVariantMapper,
+        FlashSaleProductService flashSaleProductService
+    ) {
         this.cartItemRepository = cartItemRepository;
         this.cartItemMapper = cartItemMapper;
         this.productVariantRepository = productVariantRepository;
         this.productVariantMapper = productVariantMapper;
+        this.flashSaleProductService = flashSaleProductService;
     }
 
     @Override
@@ -171,6 +180,16 @@ public class CartItemServiceImpl implements CartItemService {
         List<ProductVariantDTO> variants = productVariantRepository.findAllByIdIn(variantIds).stream().map(productVariantMapper::toDto).toList();
         Map<Long, ProductVariantDTO> variantById = variants.stream()
             .collect(Collectors.toMap(ProductVariantDTO::getId, v -> v));
+
+        // Set promotionPrice từ FlashSaleProduct cho mỗi variant
+        variantById.values().forEach(dto -> {
+            if (dto.getId() != null) {
+                flashSaleProductService.findActiveByProductVariantId(dto.getId())
+                    .ifPresent(flashSaleProduct -> {
+                        dto.setPromotionPrice(flashSaleProduct.getSalePrice());
+                    });
+            }
+        });
 
         return items.stream()
             .map(item -> {

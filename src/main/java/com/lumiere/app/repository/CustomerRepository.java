@@ -43,6 +43,13 @@ public interface CustomerRepository
     Optional<Customer> findOneWithToOneRelationships(@Param("id") Long id);
 
     /**
+     * Find all customers with user relationship using Specification.
+     * This method uses EntityGraph to fetch user eagerly.
+     */
+    @EntityGraph(attributePaths = { "user" })
+    Page<Customer> findAll(org.springframework.data.jpa.domain.Specification<Customer> spec, Pageable pageable);
+
+    /**
      * Tìm Customer theo User ID.
      */
     @Query("select customer from Customer customer where customer.user.id = :userId")

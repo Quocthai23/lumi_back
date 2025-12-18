@@ -231,6 +231,20 @@ public class OrdersResource {
     }
 
     /**
+     * Xuất Excel danh sách đơn hàng.
+     * Ví dụ: GET /api/orders/export
+     */
+    @GetMapping(
+        value = "/export",
+        produces = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+    @PreAuthorize("hasAnyRole('ROLE_ADMIN')")
+    public void exportOrdersToExcel(HttpServletResponse response) {
+        LOG.debug("REST request to export all orders to Excel");
+        ordersService.exportOrdersToExcel(response);
+    }
+
+    /**
      * {@code POST  /orders/create-from-cart} : Tạo đơn hàng từ giỏ hàng.
      *
      * @param request thông tin tạo đơn hàng
@@ -306,7 +320,8 @@ public class OrdersResource {
         // Kiểm tra quyền: nếu không phải admin, chỉ cho phép hủy đơn hàng của chính họ
         Optional<Long> currentUserId = SecurityUtils.getCurrentUserId();
         if (currentUserId.isPresent()) {
-            Orders order = ordersRepository.findById(id)
+            // Sử dụng query với fetch join để tránh LazyInitializationException
+            Orders order = ordersRepository.findOneWithCustomerAndUser(id)
                 .orElseThrow(() -> new BadRequestAlertException("Order not found", ENTITY_NAME, "idnotfound"));
             
             // Kiểm tra nếu user là customer và đơn hàng không thuộc về họ

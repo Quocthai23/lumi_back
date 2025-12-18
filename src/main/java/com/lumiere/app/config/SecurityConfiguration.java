@@ -73,6 +73,7 @@ public class SecurityConfiguration {
                     // Flash Sale APIs - cho phép khách vãng lai xem flash sale
                     .requestMatchers(mvc.pattern(HttpMethod.GET, "/api/flash-sales/**")).permitAll()
                     .requestMatchers(mvc.pattern(HttpMethod.GET, "/api/flash-sale-products/**")).permitAll()
+                    .requestMatchers(mvc.pattern(HttpMethod.POST, "/api/customers")).permitAll()
                     .requestMatchers(mvc.pattern("/api/admin/**")).hasAuthority(AuthoritiesConstants.ADMIN)
                     .requestMatchers(mvc.pattern("/api/**")).authenticated()
                     .requestMatchers(mvc.pattern("/v3/api-docs/**")).hasAuthority(AuthoritiesConstants.ADMIN)

@@ -3,7 +3,6 @@ package com.lumiere.app.web.rest;
 import com.lumiere.app.config.Constants;
 import com.lumiere.app.domain.User;
 import com.lumiere.app.repository.UserRepository;
-import com.lumiere.app.security.AuthoritiesConstants;
 import com.lumiere.app.service.MailService;
 import com.lumiere.app.service.UserService;
 import com.lumiere.app.service.dto.AdminUserDTO;
@@ -24,7 +23,6 @@ import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 import tech.jhipster.web.util.HeaderUtil;
@@ -199,5 +197,27 @@ public class UserResource {
         LOG.debug("REST request to delete User: {}", login);
         userService.deleteUser(login);
         return ResponseEntity.noContent().headers(HeaderUtil.createAlert(applicationName, "userManagement.deleted", login)).build();
+    }
+
+    /**
+     * {@code PUT /users/{login}/deactivate} : deactivate the "login" User.
+     *
+     * @param login the login of the user to deactivate.
+     * @return the {@link ResponseEntity} with status {@code 200 (OK)} and with body the updated user.
+     */
+    @PutMapping("/users/{login}/deactivate")
+    public ResponseEntity<AdminUserDTO> deactivateUser(@PathVariable("login") @Pattern(regexp = Constants.LOGIN_REGEX) String login) {
+        LOG.debug("REST request to deactivate User: {}", login);
+        Optional<User> userOptional = userRepository.findOneByLogin(login.toLowerCase());
+        if (userOptional.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        User user = userOptional.get();
+        user.setActivated(false);
+        userRepository.save(user);
+        AdminUserDTO userDTO = new AdminUserDTO(user);
+        return ResponseEntity.ok()
+            .headers(HeaderUtil.createAlert(applicationName, "userManagement.deactivated", login))
+            .body(userDTO);
     }
 }

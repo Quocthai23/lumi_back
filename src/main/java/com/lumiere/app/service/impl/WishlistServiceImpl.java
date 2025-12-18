@@ -1,10 +1,10 @@
 package com.lumiere.app.service.impl;
 
-import com.lumiere.app.domain.ProductVariant;
 import com.lumiere.app.domain.WishlistItem;
 import com.lumiere.app.repository.ProductVariantRepository;
 import com.lumiere.app.repository.WishlistItemRepository;
 import com.lumiere.app.service.CartItemService;
+import com.lumiere.app.service.FlashSaleProductService;
 import com.lumiere.app.service.WishlistService;
 import com.lumiere.app.service.dto.CartItemDTO;
 import com.lumiere.app.service.dto.ProductVariantDTO;
@@ -29,18 +29,22 @@ public class WishlistServiceImpl implements WishlistService {
     private final WishlistItemMapper mapper;
     private final CartItemService cartService; // optional, inject if available
     private final ProductVariantMapper productVariantMapper;
+    private final FlashSaleProductService flashSaleProductService;
 
     public WishlistServiceImpl(
         WishlistItemRepository wishRepo,
         ProductVariantRepository variantRepo,
         WishlistItemMapper mapper,
-        Optional<CartItemService> cartService, ProductVariantMapper productVariantMapper
+        Optional<CartItemService> cartService, 
+        ProductVariantMapper productVariantMapper,
+        FlashSaleProductService flashSaleProductService
     ) {
         this.wishRepo = wishRepo;
         this.variantRepo = variantRepo;
         this.mapper = mapper;
         this.cartService = cartService.orElse(null);
         this.productVariantMapper = productVariantMapper;
+        this.flashSaleProductService = flashSaleProductService;
     }
 
     @Override
@@ -50,12 +54,26 @@ public class WishlistServiceImpl implements WishlistService {
         Set<Long> variantIds = page.getContent().stream()
             .map(WishlistItem::getVariantId).filter(Objects::nonNull).collect(Collectors.toSet());
 
-        Map<Long, ProductVariant> vmap = variantRepo.findAllByIdIn(variantIds).stream()
-            .collect(Collectors.toMap(ProductVariant::getId, v -> v));
+        Map<Long, ProductVariantDTO> vmap = variantRepo.findAllByIdIn(variantIds).stream()
+            .map(productVariantMapper::toDto)
+            .collect(Collectors.toMap(ProductVariantDTO::getId, v -> v));
 
-        page.getContent().forEach(w -> w.setProductVariant(vmap.get(w.getVariantId())));
+        // Set promotionPrice từ FlashSaleProduct cho mỗi variant
+        vmap.values().forEach(dto -> {
+            if (dto.getId() != null) {
+                flashSaleProductService.findActiveByProductVariantId(dto.getId())
+                    .ifPresent(flashSaleProduct -> {
+                        dto.setPromotionPrice(flashSaleProduct.getSalePrice());
+                    });
+            }
+        });
 
-        return page.map(mapper::toDto);
+        List<WishlistItemDTO> dtos = page.getContent().stream()
+            .map(mapper::toDto)
+            .peek(dto -> dto.setVariant(vmap.get(dto.getVariantId())))
+            .collect(Collectors.toList());
+
+        return new org.springframework.data.domain.PageImpl<>(dtos, pageable, page.getTotalElements());
     }
 
     @Override
@@ -66,6 +84,17 @@ public class WishlistServiceImpl implements WishlistService {
         Set<Long> variantIds = list.stream().map(WishlistItem::getVariantId).collect(Collectors.toSet());
         Map<Long, ProductVariantDTO> vmap = variantRepo.findAllByIdIn(variantIds).stream().map(productVariantMapper::toDto)
             .collect(Collectors.toMap(ProductVariantDTO::getId, v -> v));
+        
+        // Set promotionPrice từ FlashSaleProduct cho mỗi variant
+        vmap.values().forEach(dto -> {
+            if (dto.getId() != null) {
+                flashSaleProductService.findActiveByProductVariantId(dto.getId())
+                    .ifPresent(flashSaleProduct -> {
+                        dto.setPromotionPrice(flashSaleProduct.getSalePrice());
+                    });
+            }
+        });
+        
         List<WishlistItemDTO> rs = list.stream().map(mapper::toDto).toList();
         rs.forEach(w -> w.setVariant(vmap.get(w.getVariantId())));
         return rs;
