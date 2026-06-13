@@ -9,56 +9,70 @@ import com.lumiere.app.service.dto.OptionSelectDTO;
 import com.lumiere.app.service.mapper.OptionGroupMapper;
 import com.lumiere.app.service.mapper.OptionSelectMapper;
 import jakarta.persistence.EntityNotFoundException;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.List;
 
 @Service
 @RequiredArgsConstructor
 @Transactional
 public class OptionGroupServiceImpl implements OptionGroupService {
 
-  private final OptionGroupRepository repo;
-  private final OptionGroupMapper mapper;
+    private final OptionGroupRepository repo;
+    private final OptionGroupMapper mapper;
     private final OptionSelectMapper optionSelectMapper;
+    private final com.lumiere.app.repository.OptionVariantRepository optionVariantRepo;
 
     @Override
-  public OptionGroupDTO create(OptionGroupDTO dto){
-    if (repo.existsByProduct_IdAndCodeIgnoreCase(dto.getProductId(), dto.getCode()))
-      throw new IllegalArgumentException("OptionGroup code duplicated in product");
-    OptionGroup e = mapper.toEntity(dto);
-    return mapper.toDto(repo.save(e));
-  }
-
-  @Override
-  public OptionGroupDTO update(Long id, OptionGroupDTO dto){
-    OptionGroup e = repo.findById(id).orElseThrow(() -> new EntityNotFoundException("OptionGroup not found"));
-    if (!e.getCode().equalsIgnoreCase(dto.getCode())
-        && repo.existsByProduct_IdAndCodeIgnoreCase(e.getProduct().getId(), dto.getCode())) {
-      throw new IllegalArgumentException("OptionGroup code duplicated in product");
+    public OptionGroupDTO create(OptionGroupDTO dto) {
+        if (repo.existsByProduct_IdAndCodeIgnoreCase(dto.getProductId(), dto.getCode())) throw new IllegalArgumentException(
+            "OptionGroup code duplicated in product"
+        );
+        OptionGroup e = mapper.toEntity(dto);
+        return mapper.toDto(repo.save(e));
     }
-    e.setName(dto.getName());
-    e.setCode(dto.getCode());
-    e.setPosition(dto.getPosition());
-    return mapper.toDto(repo.save(e));
-  }
 
-  @Override
-  @Transactional(readOnly = true)
-  public List<OptionGroupDTO> findByProduct(Long productId){
-    return repo.findByProduct_IdOrderByPositionAscIdAsc(productId).stream().map(entity->{
-        List<OptionSelectDTO> optionSelectDTOS = entity.getSelects().stream().map(optionSelectMapper::toDto).toList();
-        OptionGroupDTO dto = mapper.toDto(entity);
-        dto.setOptionSelectDTOS(optionSelectDTOS);
-        dto.setSelects(null);
-        return dto;
-    }).toList();
-  }
+    @Override
+    public OptionGroupDTO update(Long id, OptionGroupDTO dto) {
+        OptionGroup e = repo.findById(id).orElseThrow(() -> new EntityNotFoundException("OptionGroup not found"));
+        if (
+            !e.getCode().equalsIgnoreCase(dto.getCode()) && repo.existsByProduct_IdAndCodeIgnoreCase(e.getProduct().getId(), dto.getCode())
+        ) {
+            throw new IllegalArgumentException("OptionGroup code duplicated in product");
+        }
+        e.setName(dto.getName());
+        e.setCode(dto.getCode());
+        e.setPosition(dto.getPosition());
+        return mapper.toDto(repo.save(e));
+    }
 
-  @Override
-  public void delete(Long id){
-    repo.deleteById(id);
-  }
+    @Override
+    @Transactional(readOnly = true)
+    public List<OptionGroupDTO> findByProduct(Long productId) {
+        return repo
+            .findByProduct_IdOrderByPositionAscIdAsc(productId)
+            .stream()
+            .map(entity -> {
+                List<OptionSelectDTO> optionSelectDTOS = entity.getSelects().stream().map(optionSelectMapper::toDto).toList();
+                OptionGroupDTO dto = mapper.toDto(entity);
+                dto.setOptionSelectDTOS(optionSelectDTOS);
+                dto.setSelects(null);
+                return dto;
+            })
+            .toList();
+    }
+
+    @Override
+    public void delete(Long id) {
+        OptionGroup group = repo.findById(id).orElse(null);
+        if (group != null) {
+            List<Long> selectIds = group.getSelects().stream().map(com.lumiere.app.domain.OptionSelect::getId).toList();
+            if (!selectIds.isEmpty()) {
+                List<com.lumiere.app.domain.OptionVariant> optionVariants = optionVariantRepo.findByOptionSelect_IdIn(selectIds);
+                optionVariantRepo.deleteAllInBatch(optionVariants);
+            }
+            repo.delete(group);
+        }
+    }
 }

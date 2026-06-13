@@ -1,6 +1,8 @@
 package com.lumiere.app.web.rest;
 
+import com.lumiere.app.repository.CustomerRepository;
 import com.lumiere.app.repository.NotificationRepository;
+import com.lumiere.app.security.SecurityUtils;
 import com.lumiere.app.service.NotificationService;
 import com.lumiere.app.service.dto.NotificationDTO;
 import com.lumiere.app.web.rest.errors.BadRequestAlertException;
@@ -42,9 +44,16 @@ public class NotificationResource {
 
     private final NotificationRepository notificationRepository;
 
-    public NotificationResource(NotificationService notificationService, NotificationRepository notificationRepository) {
+    private final CustomerRepository customerRepository;
+
+    public NotificationResource(
+        NotificationService notificationService, 
+        NotificationRepository notificationRepository,
+        CustomerRepository customerRepository
+    ) {
         this.notificationService = notificationService;
         this.notificationRepository = notificationRepository;
+        this.customerRepository = customerRepository;
     }
 
     /**
@@ -215,5 +224,93 @@ public class NotificationResource {
         payload.put("nextCursor", slice.hasNext() ? nextCursor : null);
 
         return ResponseEntity.ok(payload);
+    }
+
+    /**
+     * GET /notifications/customer : Lấy notifications của customer (phân trang)
+     */
+    @GetMapping("/customer")
+    public ResponseEntity<List<NotificationDTO>> getCustomerNotifications(Pageable pageable) {
+        // Lấy customerId từ SecurityContext
+        Long customerId = getCurrentCustomerId();
+        if (customerId == null) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        Page<NotificationDTO> page = notificationService.getCustomerNotifications(customerId, pageable);
+        HttpHeaders headers = PaginationUtil
+            .generatePaginationHttpHeaders(ServletUriComponentsBuilder.fromCurrentRequest(), page);
+
+        return ResponseEntity.ok().headers(headers).body(page.getContent());
+    }
+
+    /**
+     * GET /notifications/customer/scroll : Infinite scroll cho customer notifications
+     */
+    @GetMapping("/customer/scroll")
+    public ResponseEntity<Map<String, Object>> scrollCustomerNotifications(
+        @RequestParam(required = false) Long lastId,
+        @RequestParam(defaultValue = "20") int size
+    ) {
+        Long customerId = getCurrentCustomerId();
+        if (customerId == null) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        Slice<NotificationDTO> slice = notificationService.scrollCustomerNotifications(customerId, lastId, size);
+
+        Long nextCursor = null;
+        if (!slice.isEmpty()) {
+            NotificationDTO last = slice.getContent().get(slice.getNumberOfElements() - 1);
+            nextCursor = last.getId();
+        }
+
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("items", slice.getContent());
+        payload.put("hasNext", slice.hasNext());
+        payload.put("nextCursor", slice.hasNext() ? nextCursor : null);
+
+        return ResponseEntity.ok(payload);
+    }
+
+    /**
+     * GET /notifications/unread-count : Lấy số lượng notifications chưa đọc
+     */
+    @GetMapping("/unread-count")
+    public ResponseEntity<Map<String, Long>> getUnreadCount() {
+        Long customerId = getCurrentCustomerId();
+        if (customerId == null) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        long count = notificationService.getUnreadCount(customerId);
+        Map<String, Long> response = new HashMap<>();
+        response.put("count", count);
+
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * PUT /notifications/{id}/read : Đánh dấu notification là đã đọc
+     */
+    @PutMapping("/{id}/read")
+    public ResponseEntity<NotificationDTO> markAsRead(@PathVariable Long id) {
+        NotificationDTO notificationDTO = notificationService.markAsRead(id);
+        return ResponseEntity.ok(notificationDTO);
+    }
+
+    /**
+     * Lấy customerId từ SecurityContext
+     */
+    private Long getCurrentCustomerId() {
+        try {
+            return SecurityUtils.getCurrentUserId()
+                .flatMap(userId -> customerRepository.findByUserId(userId))
+                .map(customer -> customer.getId())
+                .orElse(null);
+        } catch (Exception e) {
+            LOG.error("Error getting current customer ID", e);
+            return null;
+        }
     }
 }

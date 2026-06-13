@@ -68,4 +68,12 @@ public interface NotificationService {
     Page<NotificationDTO> getAdminNotifications(Pageable pageable);
 
     Slice<NotificationDTO> scrollAdminNotifications(Long lastId, int size);
+
+    Page<NotificationDTO> getCustomerNotifications(Long customerId, Pageable pageable);
+
+    Slice<NotificationDTO> scrollCustomerNotifications(Long customerId, Long lastId, int size);
+
+    long getUnreadCount(Long customerId);
+
+    NotificationDTO markAsRead(Long id);
 }

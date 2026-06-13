@@ -47,6 +47,11 @@ public class OrdersDTO implements Serializable {
     @DecimalMin(value = "0")
     private BigDecimal discountAmount;
 
+    @DecimalMin(value = "0")
+    private BigDecimal shippingCost;
+
+    private String shippingInfo;
+
     private CustomerDTO customer;
 
     private VoucherDTO voucher;
@@ -135,6 +140,22 @@ public class OrdersDTO implements Serializable {
         this.discountAmount = discountAmount;
     }
 
+    public BigDecimal getShippingCost() {
+        return shippingCost;
+    }
+
+    public void setShippingCost(BigDecimal shippingCost) {
+        this.shippingCost = shippingCost;
+    }
+
+    public String getShippingInfo() {
+        return shippingInfo;
+    }
+
+    public void setShippingInfo(String shippingInfo) {
+        this.shippingInfo = shippingInfo;
+    }
+
     public CustomerDTO getCustomer() {
         return customer;
     }
@@ -202,6 +223,8 @@ public class OrdersDTO implements Serializable {
             ", placedAt='" + getPlacedAt() + "'" +
             ", redeemedPoints=" + getRedeemedPoints() +
             ", discountAmount=" + getDiscountAmount() +
+            ", shippingCost=" + getShippingCost() +
+            ", shippingInfo='" + getShippingInfo() + "'" +
             ", customer=" + getCustomer() +
             ", voucher=" + getVoucher() +
             "}";

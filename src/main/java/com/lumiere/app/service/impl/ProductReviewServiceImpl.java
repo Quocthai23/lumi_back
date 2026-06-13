@@ -1,11 +1,13 @@
 package com.lumiere.app.service.impl;
 
 import com.lumiere.app.domain.ProductReview;
+import com.lumiere.app.domain.enumeration.NotificationType;
 import com.lumiere.app.domain.enumeration.ReviewStatus;
 import com.lumiere.app.repository.ProductReviewRepository;
 import com.lumiere.app.service.ProductReviewService;
 import com.lumiere.app.service.dto.ProductReviewDTO;
 import com.lumiere.app.service.dto.ReviewRatingMessage;
+import com.lumiere.app.service.kafka.NotificationProducerService;
 import com.lumiere.app.service.mapper.ProductReviewMapper;
 import java.util.Optional;
 import org.slf4j.Logger;
@@ -31,14 +33,18 @@ public class ProductReviewServiceImpl implements ProductReviewService {
 
     private final KafkaTemplate<String, Object> kafkaTemplate;
 
+    private final NotificationProducerService notificationProducerService;
+
     public ProductReviewServiceImpl(
         ProductReviewRepository productReviewRepository,
         ProductReviewMapper productReviewMapper,
-        KafkaTemplate<String, Object> kafkaTemplate
+        KafkaTemplate<String, Object> kafkaTemplate,
+        NotificationProducerService notificationProducerService
     ) {
         this.productReviewRepository = productReviewRepository;
         this.productReviewMapper = productReviewMapper;
         this.kafkaTemplate = kafkaTemplate;
+        this.notificationProducerService = notificationProducerService;
     }
 
     @Override
@@ -46,6 +52,21 @@ public class ProductReviewServiceImpl implements ProductReviewService {
         LOG.debug("Request to save ProductReview : {}", productReviewDTO);
         ProductReview productReview = productReviewMapper.toEntity(productReviewDTO);
         productReview = productReviewRepository.save(productReview);
+        
+        // Gửi notification cho admin về review mới
+        if (productReview.getProduct() != null) {
+            String productName = productReview.getProduct().getName() != null ? 
+                productReview.getProduct().getName() : "Sản phẩm #" + productReview.getProduct().getId();
+            String adminMessage = String.format("Có đánh giá mới từ %s cho sản phẩm: %s", 
+                productReview.getAuthor() != null ? productReview.getAuthor() : "Khách hàng",
+                productName);
+            notificationProducerService.sendAdminNotification(
+                NotificationType.NEW_REVIEW,
+                adminMessage,
+                "/admin/product-reviews/" + productReview.getId()
+            );
+        }
+        
         return productReviewMapper.toDto(productReview);
     }
 

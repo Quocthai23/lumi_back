@@ -45,6 +45,8 @@ public class ProductVariantDTO implements Serializable {
 
     private String urlImage;
 
+    private BigDecimal promotionPrice;
+
     public Long getId() {
         return id;
     }
@@ -131,6 +133,22 @@ public class ProductVariantDTO implements Serializable {
 
     public void setProduct(ProductDTO product) {
         this.product = product;
+    }
+
+    public String getUrlImage() {
+        return urlImage;
+    }
+
+    public void setUrlImage(String urlImage) {
+        this.urlImage = urlImage;
+    }
+
+    public BigDecimal getPromotionPrice() {
+        return promotionPrice;
+    }
+
+    public void setPromotionPrice(BigDecimal promotionPrice) {
+        this.promotionPrice = promotionPrice;
     }
 
     @Override

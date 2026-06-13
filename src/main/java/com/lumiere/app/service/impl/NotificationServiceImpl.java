@@ -110,4 +110,46 @@ public class NotificationServiceImpl implements NotificationService {
             : notificationRepository.findAllByCustomerIdIsNullAndIdLessThanOrderByIdDesc(lastId, pr);
 
         return slice.map(notificationMapper::toDto);
-    }}
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<NotificationDTO> getCustomerNotifications(Long customerId, Pageable pageable) {
+        Pageable p = pageable.getSort().isSorted()
+            ? pageable
+            : PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), Sort.by(Sort.Direction.DESC, "createdAt"));
+
+        return notificationRepository.findAllByCustomerId(customerId, p)
+            .map(notificationMapper::toDto);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Slice<NotificationDTO> scrollCustomerNotifications(Long customerId, Long lastId, int size) {
+        PageRequest pr = PageRequest.of(0, size, Sort.by(Sort.Direction.DESC, "id"));
+
+        Slice<Notification> slice = (lastId == null)
+            ? notificationRepository.findAllByCustomerIdOrderByIdDesc(customerId, pr)
+            : notificationRepository.findAllByCustomerIdAndIdLessThanOrderByIdDesc(customerId, lastId, pr);
+
+        return slice.map(notificationMapper::toDto);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public long getUnreadCount(Long customerId) {
+        return notificationRepository.countByCustomerIdAndIsReadFalse(customerId);
+    }
+
+    @Override
+    @Transactional
+    public NotificationDTO markAsRead(Long id) {
+        Notification notification = notificationRepository.findById(id)
+            .orElseThrow(() -> new IllegalArgumentException("Notification not found: " + id));
+        
+        notification.setIsRead(true);
+        notification = notificationRepository.save(notification);
+        
+        return notificationMapper.toDto(notification);
+    }
+}

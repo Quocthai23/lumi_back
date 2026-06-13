@@ -47,7 +47,10 @@ public class CustomerQueryService extends QueryService<Customer> {
     public Page<CustomerDTO> findByCriteria(CustomerCriteria criteria, Pageable page) {
         LOG.debug("find by criteria : {}, page: {}", criteria, page);
         final Specification<Customer> specification = createSpecification(criteria);
-        return customerRepository.fetchBagRelationships(customerRepository.findAll(specification, page)).map(customerMapper::toDto);
+        // Use findAll with EntityGraph to fetch user eagerly
+        Page<Customer> customersPage = customerRepository.findAll(specification, page);
+        // Fetch bag relationships (wishlists) and map to DTO
+        return customerRepository.fetchBagRelationships(customersPage).map(customerMapper::toDto);
     }
 
     /**

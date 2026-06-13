@@ -62,15 +62,24 @@ public interface OrdersService {
     void writeOrderInvoiceExcel(Long orderId, HttpServletResponse response);
 
     /**
+     * Xuất Excel danh sách đơn hàng.
+     *
+     * @param response HTTP response để ghi file Excel
+     */
+    void exportOrdersToExcel(HttpServletResponse response);
+
+    /**
      * Tạo đơn hàng từ giỏ hàng của khách hàng hiện tại.
      *
      * @param paymentMethod phương thức thanh toán
      * @param note ghi chú đơn hàng
      * @param redeemedPoints điểm tích lũy sử dụng
      * @param voucherCode mã voucher (tùy chọn)
+     * @param shippingCost phí vận chuyển
+     * @param shippingInfo thông tin giao hàng dạng JSON
      * @return đơn hàng đã tạo
      */
-    OrdersDTO createOrderFromCart(String paymentMethod, String note, Integer redeemedPoints, String voucherCode);
+    OrdersDTO createOrderFromCart(String paymentMethod, String note, Integer redeemedPoints, String voucherCode, java.math.BigDecimal shippingCost, String shippingInfo);
 
     /**
      * Cập nhật trạng thái đơn hàng.
@@ -187,5 +196,39 @@ public interface OrdersService {
     List<com.lumiere.app.service.dto.ProductReviewDTO> createReviewsForOrder(
         Long orderId,
         List<com.lumiere.app.service.dto.CreateOrderReviewDTO> reviews
+    );
+
+    /**
+     * Tính toán trạng thái đơn hàng tiếp theo dựa trên trạng thái hiện tại và trạng thái thanh toán.
+     *
+     * @param currentStatus trạng thái hiện tại
+     * @param paymentStatus trạng thái thanh toán
+     * @return trạng thái tiếp theo, hoặc null nếu không có trạng thái tiếp theo
+     */
+    com.lumiere.app.domain.enumeration.OrderStatus getNextOrderStatus(
+        com.lumiere.app.domain.enumeration.OrderStatus currentStatus,
+        com.lumiere.app.domain.enumeration.PaymentStatus paymentStatus
+    );
+
+    /**
+     * Tạo đơn hàng cho khách vãng lai (không cần đăng nhập).
+     *
+     * @param cartItems danh sách sản phẩm trong giỏ hàng
+     * @param paymentMethod phương thức thanh toán
+     * @param note ghi chú đơn hàng
+     * @param redeemedPoints điểm tích lũy sử dụng (0 cho guest)
+     * @param voucherCode mã voucher (tùy chọn)
+     * @param shippingCost phí vận chuyển
+     * @param shippingInfo thông tin giao hàng
+     * @return đơn hàng đã tạo
+     */
+    OrdersDTO createGuestOrder(
+        List<com.lumiere.app.service.dto.GuestCartItemDTO> cartItems,
+        String paymentMethod,
+        String note,
+        Integer redeemedPoints,
+        String voucherCode,
+        java.math.BigDecimal shippingCost,
+        String shippingInfo
     );
 }

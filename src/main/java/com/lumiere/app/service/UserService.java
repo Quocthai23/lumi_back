@@ -2,8 +2,10 @@ package com.lumiere.app.service;
 
 import com.lumiere.app.config.Constants;
 import com.lumiere.app.domain.Authority;
+import com.lumiere.app.domain.Customer;
 import com.lumiere.app.domain.User;
 import com.lumiere.app.repository.AuthorityRepository;
+import com.lumiere.app.repository.CustomerRepository;
 import com.lumiere.app.repository.UserRepository;
 import com.lumiere.app.security.AuthoritiesConstants;
 import com.lumiere.app.security.SecurityUtils;
@@ -41,16 +43,20 @@ public class UserService {
 
     private final CacheManager cacheManager;
 
+    private final CustomerRepository customerRepository;
+
     public UserService(
         UserRepository userRepository,
         PasswordEncoder passwordEncoder,
         AuthorityRepository authorityRepository,
-        CacheManager cacheManager
+        CacheManager cacheManager,
+        CustomerRepository customerRepository
     ) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.authorityRepository = authorityRepository;
         this.cacheManager = cacheManager;
+        this.customerRepository = customerRepository;
     }
 
     public Optional<User> activateRegistration(String key) {
@@ -94,6 +100,10 @@ public class UserService {
     }
 
     public User registerUser(AdminUserDTO userDTO, String password) {
+        return registerUser(userDTO, password, null);
+    }
+
+    public User registerUser(AdminUserDTO userDTO, String password, Long customerId) {
         userRepository
             .findOneByLogin(userDTO.getLogin().toLowerCase())
             .ifPresent(existingUser -> {
@@ -130,6 +140,16 @@ public class UserService {
         authorityRepository.findById(AuthoritiesConstants.USER).ifPresent(authorities::add);
         newUser.setAuthorities(authorities);
         userRepository.save(newUser);
+        
+        // Link customer to user if customerId is provided
+        if (customerId != null) {
+            customerRepository.findById(customerId).ifPresent(customer -> {
+                customer.setUser(newUser);
+                customerRepository.save(customer);
+                LOG.debug("Linked Customer {} to User {}", customerId, newUser.getLogin());
+            });
+        }
+        
         this.clearUserCaches(newUser);
         LOG.debug("Created Information for User: {}", newUser);
         return newUser;

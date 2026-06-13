@@ -3,6 +3,7 @@ package com.lumiere.app.service.impl;
 import com.lumiere.app.domain.*;
 import com.lumiere.app.domain.enumeration.CustomerTier;
 import com.lumiere.app.domain.enumeration.LoyaltyTransactionType;
+import com.lumiere.app.domain.enumeration.NotificationType;
 import com.lumiere.app.domain.enumeration.OrderStatus;
 import com.lumiere.app.domain.enumeration.PaymentStatus;
 import com.lumiere.app.domain.enumeration.RatingType;
@@ -11,8 +12,12 @@ import com.lumiere.app.repository.*;
 import com.lumiere.app.security.SecurityUtils;
 import com.lumiere.app.service.*;
 import com.lumiere.app.service.dto.*;
+import com.lumiere.app.service.kafka.NotificationProducerService;
+import com.lumiere.app.service.kafka.OrderStockProducerService;
+import com.lumiere.app.service.OrderStockRestoreService;
 import com.lumiere.app.service.mapper.OrderStatusHistoryMapper;
 import com.lumiere.app.service.mapper.OrdersMapper;
+import com.lumiere.app.service.dto.OrderStockProcessingMessage;
 
 import java.math.BigDecimal;
 import java.net.URLEncoder;
@@ -29,6 +34,7 @@ import java.util.stream.Collectors;
 
 import com.lumiere.app.service.mapper.ProductMapper;
 import com.lumiere.app.service.mapper.ProductVariantMapper;
+import com.lumiere.app.service.FlashSaleProductService;
 import com.lumiere.app.utils.RatingUtils;
 import jakarta.servlet.ServletOutputStream;
 import jakarta.servlet.http.HttpServletResponse;
@@ -75,6 +81,10 @@ public class OrdersServiceImpl implements OrdersService {
     private final InventoryRepository inventoryRepository;
     private final ProductMapper productMapper;
     private final ProductService productService;
+    private final NotificationProducerService notificationProducerService;
+    private final OrderStockProducerService orderStockProducerService;
+    private final OrderStockRestoreService orderStockRestoreService;
+    private final FlashSaleProductService flashSaleProductService;
 
     public OrdersServiceImpl(
         OrdersRepository ordersRepository,
@@ -117,6 +127,10 @@ public class OrdersServiceImpl implements OrdersService {
         this.inventoryRepository = inventoryRepository;
         this.productMapper = productMapper;
         this.productService = productService;
+        this.notificationProducerService = notificationProducerService;
+        this.orderStockProducerService = orderStockProducerService;
+        this.orderStockRestoreService = orderStockRestoreService;
+        this.flashSaleProductService = flashSaleProductService;
     }
 
     @Override
@@ -345,23 +359,32 @@ public class OrdersServiceImpl implements OrdersService {
     }
 
     @Override
-    @Transactional
-    public OrdersDTO createOrderFromCart(String paymentMethod, String note, Integer redeemedPoints, String voucherCode) {
-        // Lấy userId từ SecurityContext
-        Long userId = SecurityUtils.getCurrentUserId()
-            .orElseThrow(() -> new IllegalArgumentException("User not authenticated"));
+    @Transactional(readOnly = true)
+    public void exportOrdersToExcel(HttpServletResponse response) {
+        LOG.debug("Request to export all orders to Excel");
+        
+        // Lấy tất cả đơn hàng
+        List<Orders> orders = ordersRepository.findAllWithToOneRelationships();
+        List<OrdersDTO> ordersDTO = orders.stream()
+            .map(ordersMapper::toDto)
+            .collect(Collectors.toList());
 
-        LOG.debug("Request to create order from cart for user: {} with voucher: {}", userId, voucherCode);
+        try (Workbook wb = new XSSFWorkbook()) {
+            // ====== Styles ======
+            Font fTitle = wb.createFont();
+            fTitle.setBold(true);
+            fTitle.setFontHeightInPoints((short) 16);
+            CellStyle sTitle = wb.createCellStyle();
+            sTitle.setFont(fTitle);
 
-        // Lấy customer từ userId
-        Customer customer = customerRepository.findByUserId(userId)
-            .orElseThrow(() -> new IllegalArgumentException("Customer not found for user: " + userId));
-
-        // Lấy tất cả items trong giỏ hàng
-        List<CartItem> cartItems = cartItemRepository.findAllByCustomerId(userId);
-        if (cartItems.isEmpty()) {
-            throw new IllegalArgumentException("Cart is empty");
-        }
+            Font fHdr = wb.createFont();
+            fHdr.setBold(true);
+            CellStyle sHdr = wb.createCellStyle();
+            sHdr.setFont(fHdr);
+            sHdr.setFillForegroundColor(IndexedColors.GREY_25_PERCENT.getIndex());
+            sHdr.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+            setAllBorders(sHdr, BorderStyle.THIN);
+            sHdr.setAlignment(HorizontalAlignment.CENTER);
 
         for (CartItem cartItem : cartItems) {
             ProductVariant variant = productVariantRepository.findById(cartItem.getVariantId())
@@ -381,8 +404,33 @@ public class OrdersServiceImpl implements OrdersService {
         String orderCode = generateOrderCode();
 
         BigDecimal subtotal = BigDecimal.ZERO;
+        BigDecimal flashSaleDiscount = BigDecimal.ZERO;
         for (CartItem cartItem : cartItems) {
-            BigDecimal itemTotal = cartItem.getTotalPrice();
+            // Lấy giá gốc từ ProductVariant
+            ProductVariant variant = productVariantRepository.findById(cartItem.getVariantId())
+                .orElseThrow(() -> new IllegalArgumentException("Product variant not found: " + cartItem.getVariantId()));
+            BigDecimal originalPrice = variant.getPrice() != null ? variant.getPrice() : BigDecimal.ZERO;
+            
+            // Kiểm tra xem product variant có trong flash sale đang active không
+            BigDecimal unitPrice = originalPrice;
+            Optional<com.lumiere.app.service.dto.FlashSaleProductDTO> flashSaleProductOpt = 
+                flashSaleProductService.findActiveByProductVariantId(cartItem.getVariantId());
+            if (flashSaleProductOpt.isPresent()) {
+                com.lumiere.app.service.dto.FlashSaleProductDTO flashSaleProduct = flashSaleProductOpt.get();
+                // Nếu có flash sale, sử dụng giá flash sale
+                if (flashSaleProduct.getSalePrice() != null) {
+                    unitPrice = flashSaleProduct.getSalePrice();
+                    // Tính discount từ flash sale cho item này
+                    BigDecimal itemFlashSaleDiscount = originalPrice.subtract(unitPrice)
+                        .multiply(BigDecimal.valueOf(cartItem.getQuantity()));
+                    flashSaleDiscount = flashSaleDiscount.add(itemFlashSaleDiscount);
+                }
+                flashSaleProduct.setSold(flashSaleProduct.getSold() + cartItem.getQuantity());
+                flashSaleProductService.save(flashSaleProduct);
+            }
+            
+            // Tính tổng tiền cho item này
+            BigDecimal itemTotal = unitPrice.multiply(BigDecimal.valueOf(cartItem.getQuantity()));
             subtotal = subtotal.add(itemTotal);
         }
 
@@ -423,9 +471,11 @@ public class OrdersServiceImpl implements OrdersService {
         }
 
         // Tính tổng tiền (subtotal + shipping fee)
-        BigDecimal totalAmount = subtotal.add(shippingFee);
+        BigDecimal totalAmount = subtotal;
 
-        BigDecimal discountAmount = BigDecimal.ZERO;
+        // Discount từ flash sale được tính vào discountAmount
+        BigDecimal discountAmount = flashSaleDiscount;
+        BigDecimal voucherDiscount = BigDecimal.ZERO;
         Voucher voucher = null;
 
         // Xử lý voucher nếu có
@@ -434,19 +484,26 @@ public class OrdersServiceImpl implements OrdersService {
                 // Validate voucher
                 voucher = voucherService.validateVoucher(voucherCode, totalAmount);
 
-                // Tính số tiền giảm giá
-                discountAmount = voucherService.calculateDiscountAmount(voucher, totalAmount);
+                // Tính số tiền giảm giá từ voucher
+                voucherDiscount = voucherService.calculateDiscountAmount(voucher, totalAmount);
+                
+                // Cộng discount từ voucher vào discountAmount
+                discountAmount = discountAmount.add(voucherDiscount);
 
                 // Trừ số tiền giảm giá từ tổng tiền
-                totalAmount = totalAmount.subtract(discountAmount);
+                totalAmount = totalAmount.subtract(voucherDiscount);
                 if (totalAmount.compareTo(BigDecimal.ZERO) < 0) {
                     totalAmount = BigDecimal.ZERO;
                 }
 
-                LOG.debug("Applied voucher: {}, discount amount: {}", voucherCode, discountAmount);
+                LOG.debug("Applied voucher: {}, discount amount: {}", voucherCode, voucherDiscount);
             } catch (IllegalArgumentException e) {
                 throw new IllegalArgumentException("Lỗi voucher: " + e.getMessage());
             }
+        }
+        
+        if (flashSaleDiscount.compareTo(BigDecimal.ZERO) > 0) {
+            LOG.debug("Flash sale discount: {}", flashSaleDiscount);
         }
 
         // Trừ điểm tích lũy nếu có
@@ -484,7 +541,7 @@ public class OrdersServiceImpl implements OrdersService {
         order.setCode(orderCode);
         order.setStatus(OrderStatus.PENDING);
         order.setPaymentStatus(PaymentStatus.UNPAID);
-        order.setTotalAmount(totalAmount);
+        order.setTotalAmount(totalAmount.add(shippingCost));
         order.setNote(note);
         order.setPaymentMethod(paymentMethod);
 
@@ -495,6 +552,8 @@ public class OrdersServiceImpl implements OrdersService {
         order.setPlacedAt(Instant.now());
         order.setRedeemedPoints(redeemedPoints != null ? redeemedPoints : 0);
         order.setDiscountAmount(discountAmount);
+        order.setShippingCost(shippingCost != null ? shippingCost : BigDecimal.ZERO);
+        order.setShippingInfo(shippingInfo);
         order.setVoucher(voucher);
         order.setCustomer(customer);
 
@@ -512,21 +571,90 @@ public class OrdersServiceImpl implements OrdersService {
             ProductVariant variant = productVariantRepository.findById(cartItem.getVariantId())
                 .orElseThrow(() -> new IllegalArgumentException("Product variant not found: " + cartItem.getVariantId()));
 
+            // Kiểm tra xem product variant có trong flash sale đang active không
+            BigDecimal unitPrice = cartItem.getUnitPrice();
+            Optional<com.lumiere.app.service.dto.FlashSaleProductDTO> flashSaleProductOpt = 
+                flashSaleProductService.findActiveByProductVariantId(cartItem.getVariantId());
+            if (flashSaleProductOpt.isPresent()) {
+                com.lumiere.app.service.dto.FlashSaleProductDTO flashSaleProduct = flashSaleProductOpt.get();
+                // Nếu có flash sale, sử dụng giá flash sale
+                if (flashSaleProduct.getSalePrice() != null) {
+                    unitPrice = flashSaleProduct.getSalePrice();
+                }
+            }
+            
+            // Tính tổng tiền cho item này
+            BigDecimal itemTotalPrice = unitPrice.multiply(BigDecimal.valueOf(cartItem.getQuantity()));
+
             OrderItem orderItem = new OrderItem();
             orderItem.setOrder(order);
             orderItem.setProductVariant(variant);
             orderItem.setQuantity(cartItem.getQuantity());
-            orderItem.setUnitPrice(cartItem.getUnitPrice());
-            orderItem.setTotalPrice(cartItem.getTotalPrice());
+            orderItem.setUnitPrice(unitPrice);
+            orderItem.setTotalPrice(itemTotalPrice);
 
             orderItemRepository.save(orderItem);
         }
+
+        // Tính lại discount từ flash sale dựa trên OrderItems đã tạo (sau khi đã lưu)
+        BigDecimal recalculatedFlashSaleDiscount = BigDecimal.ZERO;
+        List<OrderItem> savedOrderItems = orderItemRepository.findAllByOrderId(order.getId());
+        for (OrderItem orderItem : savedOrderItems) {
+            ProductVariant variant = orderItem.getProductVariant();
+            if (variant != null && variant.getPrice() != null) {
+                BigDecimal originalPrice = variant.getPrice();
+                BigDecimal salePrice = orderItem.getUnitPrice();
+                
+                // Nếu giá bán nhỏ hơn giá gốc, có discount từ flash sale
+                if (salePrice.compareTo(originalPrice) < 0) {
+                    BigDecimal itemDiscount = originalPrice.subtract(salePrice)
+                        .multiply(BigDecimal.valueOf(orderItem.getQuantity()));
+                    recalculatedFlashSaleDiscount = recalculatedFlashSaleDiscount.add(itemDiscount);
+                }
+            }
+        }
+        
+        // Tính lại discountAmount: flash sale discount (tính lại) + voucher discount
+        BigDecimal finalDiscountAmount = recalculatedFlashSaleDiscount.add(voucherDiscount);
+        
+        // Cập nhật discountAmount vào order
+        order.setDiscountAmount(finalDiscountAmount);
+        order = ordersRepository.save(order);
+        
+        if (recalculatedFlashSaleDiscount.compareTo(BigDecimal.ZERO) > 0) {
+            LOG.debug("Recalculated flash sale discount based on OrderItems: {}", recalculatedFlashSaleDiscount);
+        }
+        LOG.debug("Final discount amount (flash sale + voucher): {}", finalDiscountAmount);
 
         // Xóa giỏ hàng
         cartItemRepository.deleteAll(cartItems);
 
         // Tạo lịch sử trạng thái
         createOrderStatusHistory(order, OrderStatus.PENDING, "Đơn hàng được tạo từ giỏ hàng");
+
+        // Gửi notification cho admin về đơn hàng mới
+        String customerName = (customer.getFirstName() != null ? customer.getFirstName() : "") + 
+                             (customer.getLastName() != null ? " " + customer.getLastName() : "");
+        customerName = customerName.trim().isEmpty() ? "Khách hàng #" + customer.getId() : customerName;
+        String adminMessage = String.format("Có đơn hàng mới #%s từ %s với tổng tiền %s VND", 
+            orderCode, customerName, totalAmount);
+        notificationProducerService.sendAdminNotification(
+            NotificationType.NEW_ORDER,
+            adminMessage,
+            "/admin/orders/" + order.getId()
+        );
+
+        // Gửi message vào Kafka để xử lý stock quantity bất đồng bộ
+        List<OrderStockProcessingMessage.StockDeductionItem> stockItems = cartItems.stream()
+            .map(cartItem -> new OrderStockProcessingMessage.StockDeductionItem(
+                cartItem.getVariantId(),
+                cartItem.getQuantity() != null ? cartItem.getQuantity().longValue() : 0L
+            ))
+            .collect(Collectors.toList());
+        
+        OrderStockProcessingMessage stockMessage = new OrderStockProcessingMessage(order.getId(), stockItems);
+        orderStockProducerService.sendStockProcessingMessage(stockMessage);
+        LOG.info("Sent stock processing message to Kafka for order: {}", order.getId());
 
         OrdersDTO dto = ordersMapper.toDto(order);
         setCanReview(dto, order);
@@ -554,9 +682,47 @@ public class OrdersServiceImpl implements OrdersService {
         }
 
         order = ordersRepository.save(order);
+
+        // Gửi notification cho customer về cập nhật trạng thái đơn hàng
+        if (order.getCustomer() != null) {
+            String statusMessage = getOrderStatusMessage(newStatus);
+            String customerMessage = String.format("Đơn hàng #%s của bạn đã được cập nhật: %s", 
+                order.getCode(), statusMessage);
+            notificationProducerService.sendCustomerNotification(
+                order.getCustomer().getId(),
+                NotificationType.ORDER_UPDATE,
+                customerMessage,
+                "/orders/" + order.getId()
+            );
+        }
+
         OrdersDTO dto = ordersMapper.toDto(order);
         setCanReview(dto, order);
         return dto;
+    }
+
+    /**
+     * Lấy thông điệp trạng thái đơn hàng bằng tiếng Việt.
+     */
+    private String getOrderStatusMessage(OrderStatus status) {
+        switch (status) {
+            case PENDING:
+                return "Đang chờ xử lý";
+            case CONFIRMED:
+                return "Đã xác nhận";
+            case PROCESSING:
+                return "Đang xử lý";
+            case SHIPPING:
+                return "Đang vận chuyển";
+            case DELIVERED:
+                return "Đã giao hàng";
+            case COMPLETED:
+                return "Hoàn thành";
+            case CANCELLED:
+                return "Đã hủy";
+            default:
+                return status.toString();
+        }
     }
 
     @Override
@@ -579,6 +745,27 @@ public class OrdersServiceImpl implements OrdersService {
         createOrderStatusHistory(order, OrderStatus.CANCELLED, reason != null ? reason : "Đơn hàng bị hủy");
 
         order = ordersRepository.save(order);
+
+        // Restore stock cho các sản phẩm trong đơn hàng bị hủy (async)
+        orderStockRestoreService.restoreStockForCancelledOrder(order.getId());
+        LOG.info("Triggered stock restoration for cancelled order: {}", order.getId());
+
+        // Gửi notification cho admin về đơn hàng bị hủy
+        String customerName = order.getCustomer() != null ? 
+            ((order.getCustomer().getFirstName() != null ? order.getCustomer().getFirstName() : "") + 
+             (order.getCustomer().getLastName() != null ? " " + order.getCustomer().getLastName() : "")).trim() : 
+            "Khách hàng";
+        if (customerName.isEmpty()) {
+            customerName = "Khách hàng #" + (order.getCustomer() != null ? order.getCustomer().getId() : "");
+        }
+        String adminMessage = String.format("Đơn hàng #%s từ %s đã bị hủy. Lý do: %s", 
+            order.getCode(), customerName, reason != null ? reason : "Không có lý do");
+        notificationProducerService.sendAdminNotification(
+            NotificationType.ORDER_CANCELLED,
+            adminMessage,
+            "/admin/orders/" + order.getId()
+        );
+
         OrdersDTO dto = ordersMapper.toDto(order);
         setCanReview(dto, order);
         return dto;
@@ -1144,5 +1331,239 @@ public class OrdersServiceImpl implements OrdersService {
         }
 
         return createdReviews;
+    }
+
+    @Override
+    public OrderStatus getNextOrderStatus(OrderStatus currentStatus, PaymentStatus paymentStatus) {
+        // Nếu đơn hàng đã bị hủy hoặc hoàn thành, không có trạng thái tiếp theo
+        if (currentStatus == OrderStatus.CANCELLED || currentStatus == OrderStatus.COMPLETED) {
+            return null;
+        }
+
+        // Luồng trạng thái đơn hàng:
+        // PENDING -> CONFIRMED -> PROCESSING -> SHIPPING -> DELIVERED -> COMPLETED
+        // Có thể hủy ở bất kỳ trạng thái nào trước DELIVERED
+
+        switch (currentStatus) {
+            case PENDING:
+                // PENDING -> CONFIRMED (cần thanh toán nếu là QR, hoặc có thể xác nhận luôn nếu COD)
+                if (paymentStatus == PaymentStatus.PAID || paymentStatus == PaymentStatus.UNPAID) {
+                    return OrderStatus.CONFIRMED;
+                }
+                return null;
+
+            case CONFIRMED:
+                // CONFIRMED -> PROCESSING
+                return OrderStatus.PROCESSING;
+
+            case PROCESSING:
+                // PROCESSING -> SHIPPING
+                return OrderStatus.SHIPPING;
+
+            case SHIPPING:
+                // SHIPPING -> DELIVERED
+                return OrderStatus.DELIVERED;
+
+            case DELIVERED:
+                // DELIVERED -> COMPLETED
+                return OrderStatus.COMPLETED;
+
+            default:
+                return null;
+        }
+    }
+
+    @Override
+    @Transactional
+    public OrdersDTO createGuestOrder(
+        List<com.lumiere.app.service.dto.GuestCartItemDTO> cartItems,
+        String paymentMethod,
+        String note,
+        Integer redeemedPoints,
+        String voucherCode,
+        BigDecimal shippingCost,
+        String shippingInfo
+    ) {
+        LOG.debug("Request to create guest order with {} items", cartItems.size());
+
+        if (cartItems == null || cartItems.isEmpty()) {
+            throw new IllegalArgumentException("Cart is empty");
+        }
+
+        // Tạo mã đơn hàng duy nhất
+        String orderCode = generateOrderCode();
+
+        // Tính tổng tiền sản phẩm (có tính giá flash sale nếu có) và discount từ flash sale
+        BigDecimal subtotal = BigDecimal.ZERO;
+        BigDecimal flashSaleDiscount = BigDecimal.ZERO;
+        for (com.lumiere.app.service.dto.GuestCartItemDTO cartItem : cartItems) {
+            // Lấy giá gốc từ ProductVariant
+            ProductVariant variant = productVariantRepository.findById(cartItem.getVariantId())
+                .orElseThrow(() -> new IllegalArgumentException("Product variant not found: " + cartItem.getVariantId()));
+            BigDecimal originalPrice = variant.getPrice() != null ? variant.getPrice() : BigDecimal.ZERO;
+            
+            // Kiểm tra xem product variant có trong flash sale đang active không
+            BigDecimal unitPrice = originalPrice;
+            Optional<com.lumiere.app.service.dto.FlashSaleProductDTO> flashSaleProductOpt = 
+                flashSaleProductService.findActiveByProductVariantId(cartItem.getVariantId());
+            if (flashSaleProductOpt.isPresent()) {
+                com.lumiere.app.service.dto.FlashSaleProductDTO flashSaleProduct = flashSaleProductOpt.get();
+                // Nếu có flash sale, sử dụng giá flash sale
+                if (flashSaleProduct.getSalePrice() != null) {
+                    unitPrice = flashSaleProduct.getSalePrice();
+                    // Tính discount từ flash sale cho item này
+                    BigDecimal itemFlashSaleDiscount = originalPrice.subtract(unitPrice)
+                        .multiply(BigDecimal.valueOf(cartItem.getQuantity()));
+                    flashSaleDiscount = flashSaleDiscount.add(itemFlashSaleDiscount);
+                }
+            }
+            
+            // Tính tổng tiền cho item này
+            BigDecimal itemTotal = unitPrice.multiply(BigDecimal.valueOf(cartItem.getQuantity()));
+            subtotal = subtotal.add(itemTotal);
+        }
+
+        // Tính phí vận chuyển (guest users không có tier, mặc định 40,000 VND)
+        BigDecimal shippingFee = shippingCost != null ? shippingCost : BigDecimal.valueOf(40000);
+
+        // Giảm giá ship 10k nếu paymentMethod là QR
+        if (paymentMethod != null && paymentMethod.trim().equalsIgnoreCase("QR")) {
+            BigDecimal qrDiscount = BigDecimal.valueOf(10000);
+            if (shippingFee.compareTo(qrDiscount) >= 0) {
+                shippingFee = shippingFee.subtract(qrDiscount);
+                LOG.debug("QR payment method: Shipping fee reduced by 10,000 VND. New shipping fee: {}", shippingFee);
+            } else {
+                shippingFee = BigDecimal.ZERO;
+                LOG.debug("QR payment method: Shipping fee reduced to 0 VND");
+            }
+        }
+
+        // Tính tổng tiền (subtotal + shipping fee)
+        BigDecimal totalAmount = subtotal.add(shippingFee);
+
+        // Discount từ flash sale được tính vào discountAmount
+        BigDecimal discountAmount = flashSaleDiscount;
+        Voucher voucher = null;
+
+        // Xử lý voucher nếu có
+        if (voucherCode != null && !voucherCode.trim().isEmpty()) {
+            try {
+                // Validate voucher
+                voucher = voucherService.validateVoucher(voucherCode, totalAmount);
+
+                // Tính số tiền giảm giá từ voucher
+                BigDecimal voucherDiscount = voucherService.calculateDiscountAmount(voucher, totalAmount);
+                
+                // Cộng discount từ voucher vào discountAmount
+                discountAmount = discountAmount.add(voucherDiscount);
+
+                // Trừ số tiền giảm giá từ tổng tiền
+                totalAmount = totalAmount.subtract(voucherDiscount);
+                if (totalAmount.compareTo(BigDecimal.ZERO) < 0) {
+                    totalAmount = BigDecimal.ZERO;
+                }
+
+                LOG.debug("Applied voucher: {}, discount amount: {}", voucherCode, voucherDiscount);
+            } catch (IllegalArgumentException e) {
+                throw new IllegalArgumentException("Lỗi voucher: " + e.getMessage());
+            }
+        }
+        
+        if (flashSaleDiscount.compareTo(BigDecimal.ZERO) > 0) {
+            LOG.debug("Flash sale discount: {}", flashSaleDiscount);
+        }
+
+        // Guest users không có điểm tích lũy
+        if (redeemedPoints != null && redeemedPoints > 0) {
+            LOG.warn("Guest user cannot use loyalty points, ignoring redeemedPoints: {}", redeemedPoints);
+            redeemedPoints = 0;
+        }
+
+        // Tạo đơn hàng (không có customer)
+        Orders order = new Orders();
+        order.setCode(orderCode);
+        order.setStatus(OrderStatus.PENDING);
+        order.setPaymentStatus(PaymentStatus.UNPAID);
+        order.setTotalAmount(totalAmount);
+        order.setNote(note);
+        order.setPaymentMethod(paymentMethod);
+        order.setPlacedAt(Instant.now());
+        order.setRedeemedPoints(0);
+        order.setDiscountAmount(discountAmount);
+        order.setShippingCost(shippingFee);
+        order.setShippingInfo(shippingInfo);
+        order.setVoucher(voucher);
+        order.setCustomer(null); // Guest order không có customer
+
+        order = ordersRepository.save(order);
+
+        // Áp dụng voucher (tăng usage count) sau khi đơn hàng được tạo thành công
+        if (voucher != null) {
+            voucherService.applyVoucher(voucher);
+            // Guest order không có customer nên không mark voucher as used
+        }
+
+        // Tạo OrderItems từ GuestCartItemDTO
+        for (com.lumiere.app.service.dto.GuestCartItemDTO cartItem : cartItems) {
+            ProductVariant variant = productVariantRepository.findById(cartItem.getVariantId())
+                .orElseThrow(() -> new IllegalArgumentException("Product variant not found: " + cartItem.getVariantId()));
+
+            // Sử dụng unitPrice từ cartItem hoặc lấy từ variant
+            BigDecimal unitPrice = cartItem.getUnitPrice();
+            if (unitPrice == null) {
+                unitPrice = variant.getPrice() != null ? variant.getPrice() : BigDecimal.ZERO;
+            }
+            
+            // Kiểm tra xem product variant có trong flash sale đang active không
+            Optional<com.lumiere.app.service.dto.FlashSaleProductDTO> flashSaleProductOpt = 
+                flashSaleProductService.findActiveByProductVariantId(cartItem.getVariantId());
+            if (flashSaleProductOpt.isPresent()) {
+                com.lumiere.app.service.dto.FlashSaleProductDTO flashSaleProduct = flashSaleProductOpt.get();
+                // Nếu có flash sale, sử dụng giá flash sale
+                if (flashSaleProduct.getSalePrice() != null) {
+                    unitPrice = flashSaleProduct.getSalePrice();
+                }
+            }
+            
+            // Tính totalPrice
+            BigDecimal itemTotalPrice = unitPrice.multiply(BigDecimal.valueOf(cartItem.getQuantity()));
+
+            OrderItem orderItem = new OrderItem();
+            orderItem.setOrder(order);
+            orderItem.setProductVariant(variant);
+            orderItem.setQuantity(cartItem.getQuantity());
+            orderItem.setUnitPrice(unitPrice);
+            orderItem.setTotalPrice(itemTotalPrice);
+
+            orderItemRepository.save(orderItem);
+        }
+
+        // Tạo lịch sử trạng thái
+        createOrderStatusHistory(order, OrderStatus.PENDING, "Đơn hàng được tạo bởi khách vãng lai");
+
+        // Gửi notification cho admin về đơn hàng mới
+        String adminMessage = String.format("Có đơn hàng mới #%s từ khách vãng lai với tổng tiền %s VND", 
+            orderCode, totalAmount);
+        notificationProducerService.sendAdminNotification(
+            NotificationType.NEW_ORDER,
+            adminMessage,
+            "/admin/orders/" + order.getId()
+        );
+
+        // Gửi message vào Kafka để xử lý stock quantity bất đồng bộ
+        List<OrderStockProcessingMessage.StockDeductionItem> stockItems = cartItems.stream()
+            .map(cartItem -> new OrderStockProcessingMessage.StockDeductionItem(
+                cartItem.getVariantId(),
+                cartItem.getQuantity() != null ? cartItem.getQuantity().longValue() : 0L
+            ))
+            .collect(Collectors.toList());
+        
+        OrderStockProcessingMessage stockMessage = new OrderStockProcessingMessage(order.getId(), stockItems);
+        orderStockProducerService.sendStockProcessingMessage(stockMessage);
+        LOG.info("Sent stock processing message to Kafka for guest order: {}", order.getId());
+
+        OrdersDTO dto = ordersMapper.toDto(order);
+        setCanReview(dto, order);
+        return dto;
     }
 }

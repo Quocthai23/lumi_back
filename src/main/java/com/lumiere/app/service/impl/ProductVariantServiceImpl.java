@@ -2,6 +2,7 @@ package com.lumiere.app.service.impl;
 
 import com.lumiere.app.domain.ProductVariant;
 import com.lumiere.app.repository.ProductVariantRepository;
+import com.lumiere.app.service.FlashSaleProductService;
 import com.lumiere.app.service.ProductVariantService;
 import com.lumiere.app.service.dto.ProductVariantDTO;
 import com.lumiere.app.service.mapper.ProductVariantMapper;
@@ -30,9 +31,16 @@ public class ProductVariantServiceImpl implements ProductVariantService {
 
     private final ProductVariantMapper productVariantMapper;
 
-    public ProductVariantServiceImpl(ProductVariantRepository productVariantRepository, ProductVariantMapper productVariantMapper) {
+    private final FlashSaleProductService flashSaleProductService;
+
+    public ProductVariantServiceImpl(
+        ProductVariantRepository productVariantRepository,
+        ProductVariantMapper productVariantMapper,
+        FlashSaleProductService flashSaleProductService
+    ) {
         this.productVariantRepository = productVariantRepository;
         this.productVariantMapper = productVariantMapper;
+        this.flashSaleProductService = flashSaleProductService;
     }
 
     @Override
@@ -79,7 +87,17 @@ public class ProductVariantServiceImpl implements ProductVariantService {
     @Transactional(readOnly = true)
     public Optional<ProductVariantDTO> findOne(Long id) {
         LOG.debug("Request to get ProductVariant : {}", id);
-        return productVariantRepository.findOneWithEagerRelationships(id).map(productVariantMapper::toDto);
+        Optional<ProductVariantDTO> result = productVariantRepository.findOneWithEagerRelationships(id).map(productVariantMapper::toDto);
+        // Set promotionPrice từ FlashSaleProduct nếu có
+        result.ifPresent(dto -> {
+            if (dto.getId() != null) {
+                flashSaleProductService.findActiveByProductVariantId(dto.getId())
+                    .ifPresent(flashSaleProduct -> {
+                        dto.setPromotionPrice(flashSaleProduct.getSalePrice());
+                    });
+            }
+        });
+        return result;
     }
 
     @Override
@@ -90,7 +108,16 @@ public class ProductVariantServiceImpl implements ProductVariantService {
 
     @Override
     public List<ProductVariantDTO> findByProductId(Long productId){
-        return productVariantMapper.toDto(productVariantRepository.findByProductId(productId));
+        List<ProductVariantDTO> result = productVariantMapper.toDto(productVariantRepository.findByProductId(productId));
+        result.forEach(dto -> {
+            if (dto.getId() != null) {
+                flashSaleProductService.findActiveByProductVariantId(dto.getId())
+                    .ifPresent(flashSaleProduct -> {
+                        dto.setPromotionPrice(flashSaleProduct.getSalePrice());
+                    });
+            }
+        });
+        return result;
     }
 
     @Override

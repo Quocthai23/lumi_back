@@ -45,6 +45,18 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
     // Keyset cho infinite scroll (nhanh, ổn định khi dữ liệu thay đổi)
     Slice<Notification> findAllByCustomerIdIsNullAndIdLessThanOrderByIdDesc(Long lastId, Pageable pageable);
 
-    // Lấy “trang đầu” cho infinite scroll (khi chưa có lastId)
+    // Lấy "trang đầu" cho infinite scroll (khi chưa có lastId)
     Slice<Notification> findAllByCustomerIdIsNullOrderByIdDesc(Pageable pageable);
+
+    // Phân trang cho customer notifications
+    Page<Notification> findAllByCustomerId(Long customerId, Pageable pageable);
+
+    // Keyset cho infinite scroll customer notifications
+    Slice<Notification> findAllByCustomerIdAndIdLessThanOrderByIdDesc(Long customerId, Long lastId, Pageable pageable);
+
+    // Lấy "trang đầu" cho infinite scroll customer notifications
+    Slice<Notification> findAllByCustomerIdOrderByIdDesc(Long customerId, Pageable pageable);
+
+    // Đếm số notifications chưa đọc của customer
+    long countByCustomerIdAndIsReadFalse(Long customerId);
 }

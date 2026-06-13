@@ -2,11 +2,13 @@ package com.lumiere.app.service.impl;
 
 import com.lumiere.app.domain.CustomerVoucher;
 import com.lumiere.app.domain.Voucher;
+import com.lumiere.app.domain.enumeration.NotificationType;
 import com.lumiere.app.domain.enumeration.VoucherStatus;
 import com.lumiere.app.domain.enumeration.VoucherType;
 import com.lumiere.app.repository.CustomerVoucherRepository;
 import com.lumiere.app.repository.VoucherRepository;
 import com.lumiere.app.service.VoucherService;
+import com.lumiere.app.service.kafka.NotificationProducerService;
 import com.lumiere.app.service.dto.VoucherCalculateRequestDTO;
 import com.lumiere.app.service.dto.VoucherCalculateResponseDTO;
 import com.lumiere.app.service.dto.VoucherDTO;
@@ -19,6 +21,8 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -37,21 +41,41 @@ public class VoucherServiceImpl implements VoucherService {
 
     private final CustomerVoucherRepository customerVoucherRepository;
 
+    private final NotificationProducerService notificationProducerService;
+
     public VoucherServiceImpl(
         VoucherRepository voucherRepository,
         VoucherMapper voucherMapper,
-        CustomerVoucherRepository customerVoucherRepository
+        CustomerVoucherRepository customerVoucherRepository,
+        NotificationProducerService notificationProducerService
     ) {
         this.voucherRepository = voucherRepository;
         this.voucherMapper = voucherMapper;
         this.customerVoucherRepository = customerVoucherRepository;
+        this.notificationProducerService = notificationProducerService;
     }
 
     @Override
     public VoucherDTO save(VoucherDTO voucherDTO) {
         LOG.debug("Request to save Voucher : {}", voucherDTO);
         Voucher voucher = voucherMapper.toEntity(voucherDTO);
+        boolean isNew = voucher.getId() == null;
         voucher = voucherRepository.save(voucher);
+        
+        // Gửi notification cho tất cả customers về voucher mới
+        if (isNew && voucher.getStatus() == VoucherStatus.ACTIVE) {
+            // Note: Trong thực tế, có thể cần gửi cho từng customer hoặc broadcast
+            // Ở đây tôi sẽ gửi notification cho admin để admin biết có voucher mới
+            // và có thể gửi email cho customers
+            String adminMessage = String.format("Voucher mới đã được tạo: %s (Giá trị: %s)", 
+                voucher.getCode(), voucher.getValue());
+            notificationProducerService.sendAdminNotification(
+                NotificationType.NEW_VOUCHER,
+                adminMessage,
+                "/admin/vouchers/" + voucher.getId()
+            );
+        }
+        
         return voucherMapper.toDto(voucher);
     }
 
@@ -83,6 +107,15 @@ public class VoucherServiceImpl implements VoucherService {
     public List<VoucherDTO> findAll() {
         LOG.debug("Request to get all Vouchers");
         return voucherRepository.findAll().stream().map(voucherMapper::toDto).collect(Collectors.toCollection(LinkedList::new));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<VoucherDTO> findAllAvailable(Pageable pageable) {
+        LOG.debug("Request to get all available Vouchers with pagination");
+        Instant now = Instant.now();
+        Page<Voucher> vouchers = voucherRepository.findAllAvailable(VoucherStatus.ACTIVE, now, pageable);
+        return vouchers.map(voucherMapper::toDto);
     }
 
     @Override

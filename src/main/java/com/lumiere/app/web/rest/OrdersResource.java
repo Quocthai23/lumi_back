@@ -1,5 +1,6 @@
 package com.lumiere.app.web.rest;
 
+import com.lumiere.app.domain.Orders;
 import com.lumiere.app.domain.enumeration.OrderStatus;
 import com.lumiere.app.repository.CustomerRepository;
 import com.lumiere.app.repository.OrdersRepository;
@@ -230,6 +231,20 @@ public class OrdersResource {
     }
 
     /**
+     * Xuất Excel danh sách đơn hàng.
+     * Ví dụ: GET /api/orders/export
+     */
+    @GetMapping(
+        value = "/export",
+        produces = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+    @PreAuthorize("hasAnyRole('ROLE_ADMIN')")
+    public void exportOrdersToExcel(HttpServletResponse response) {
+        LOG.debug("REST request to export all orders to Excel");
+        ordersService.exportOrdersToExcel(response);
+    }
+
+    /**
      * {@code POST  /orders/create-from-cart} : Tạo đơn hàng từ giỏ hàng.
      *
      * @param request thông tin tạo đơn hàng
@@ -242,7 +257,30 @@ public class OrdersResource {
             request.getPaymentMethod(),
             request.getNote(),
             request.getRedeemedPoints(),
-            request.getVoucherCode()
+            request.getVoucherCode(),
+            request.getShippingFee(),
+            request.getShippingInfo()
+        );
+        return ResponseEntity.ok().body(ordersDTO);
+    }
+
+    /**
+     * {@code POST  /orders/create-guest-order} : Tạo đơn hàng cho khách vãng lai (không cần đăng nhập).
+     *
+     * @param request thông tin tạo đơn hàng từ guest
+     * @return the {@link ResponseEntity} with status {@code 201 (Created)} and with body the new ordersDTO.
+     */
+    @PostMapping("/create-guest-order")
+    public ResponseEntity<OrdersDTO> createGuestOrder(@Valid @RequestBody CreateGuestOrderRequest request) {
+        LOG.debug("REST request to create guest order: {}", request);
+        OrdersDTO ordersDTO = ordersService.createGuestOrder(
+            request.getCartItems(),
+            request.getPaymentMethod(),
+            request.getNote(),
+            request.getRedeemedPoints(),
+            request.getVoucherCode(),
+            request.getShippingFee(),
+            request.getShippingInfo()
         );
         return ResponseEntity.ok().body(ordersDTO);
     }
@@ -266,6 +304,7 @@ public class OrdersResource {
 
     /**
      * {@code PUT  /orders/{id}/cancel} : Hủy đơn hàng.
+     * Có thể được gọi bởi cả admin và customer (chỉ hủy đơn hàng của chính họ).
      *
      * @param id ID đơn hàng
      * @param request thông tin hủy đơn hàng
@@ -277,6 +316,27 @@ public class OrdersResource {
         @RequestBody(required = false) CancelOrderRequest request
     ) {
         LOG.debug("REST request to cancel order: {}", id);
+        
+        // Kiểm tra quyền: nếu không phải admin, chỉ cho phép hủy đơn hàng của chính họ
+        Optional<Long> currentUserId = SecurityUtils.getCurrentUserId();
+        if (currentUserId.isPresent()) {
+            // Sử dụng query với fetch join để tránh LazyInitializationException
+            Orders order = ordersRepository.findOneWithCustomerAndUser(id)
+                .orElseThrow(() -> new BadRequestAlertException("Order not found", ENTITY_NAME, "idnotfound"));
+            
+            // Kiểm tra nếu user là customer và đơn hàng không thuộc về họ
+            if (order.getCustomer() != null && order.getCustomer().getUser() != null) {
+                Long orderUserId = order.getCustomer().getUser().getId();
+                if (!currentUserId.get().equals(orderUserId)) {
+                    // Kiểm tra xem user có phải admin không
+                    boolean isAdmin = SecurityUtils.hasCurrentUserAnyOfAuthorities("ROLE_ADMIN");
+                    if (!isAdmin) {
+                        throw new BadRequestAlertException("You can only cancel your own orders", ENTITY_NAME, "unauthorized");
+                    }
+                }
+            }
+        }
+        
         String reason = request != null ? request.getReason() : null;
         OrdersDTO ordersDTO = ordersService.cancelOrder(id, reason);
         return ResponseEntity.ok().body(ordersDTO);
@@ -361,6 +421,26 @@ public class OrdersResource {
     }
 
     /**
+     * {@code GET  /orders/{id}/next-status} : Lấy trạng thái đơn hàng tiếp theo.
+     *
+     * @param id ID đơn hàng
+     * @return the {@link ResponseEntity} with status {@code 200 (OK)} and the next status in body.
+     */
+    @GetMapping("/{id}/next-status")
+    public ResponseEntity<OrderStatus> getNextOrderStatus(@PathVariable Long id) {
+        LOG.debug("REST request to get next order status: {}", id);
+        Optional<OrdersDTO> ordersDTO = ordersService.findOne(id);
+        if (ordersDTO.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        OrderStatus nextStatus = ordersService.getNextOrderStatus(
+            ordersDTO.get().getStatus(),
+            ordersDTO.get().getPaymentStatus()
+        );
+        return ResponseEntity.ok().body(nextStatus);
+    }
+
+    /**
      * {@code POST  /orders/{id}/reviews} : Tạo review cho toàn bộ đơn hàng.
      * Tạo review cho từng sản phẩm trong order và bắn Kafka để tính điểm.
      *
@@ -386,6 +466,8 @@ public class OrdersResource {
         private String note;
         private Integer redeemedPoints;
         private String voucherCode;
+        private java.math.BigDecimal shippingFee;
+        private String shippingInfo;
 
         public String getPaymentMethod() {
             return paymentMethod;
@@ -417,6 +499,22 @@ public class OrdersResource {
 
         public void setVoucherCode(String voucherCode) {
             this.voucherCode = voucherCode;
+        }
+
+        public java.math.BigDecimal getShippingFee() {
+            return shippingFee;
+        }
+
+        public void setShippingFee(java.math.BigDecimal shippingFee) {
+            this.shippingFee = shippingFee;
+        }
+
+        public String getShippingInfo() {
+            return shippingInfo;
+        }
+
+        public void setShippingInfo(String shippingInfo) {
+            this.shippingInfo = shippingInfo;
         }
     }
 
@@ -457,6 +555,75 @@ public class OrdersResource {
 
         public void setReason(String reason) {
             this.reason = reason;
+        }
+    }
+
+    /**
+     * Request DTO cho tạo đơn hàng từ khách vãng lai.
+     */
+    public static class CreateGuestOrderRequest {
+        private java.util.List<com.lumiere.app.service.dto.GuestCartItemDTO> cartItems;
+        private String paymentMethod;
+        private String note;
+        private Integer redeemedPoints;
+        private String voucherCode;
+        private java.math.BigDecimal shippingFee;
+        private String shippingInfo;
+
+        public java.util.List<com.lumiere.app.service.dto.GuestCartItemDTO> getCartItems() {
+            return cartItems;
+        }
+
+        public void setCartItems(java.util.List<com.lumiere.app.service.dto.GuestCartItemDTO> cartItems) {
+            this.cartItems = cartItems;
+        }
+
+        public String getPaymentMethod() {
+            return paymentMethod;
+        }
+
+        public void setPaymentMethod(String paymentMethod) {
+            this.paymentMethod = paymentMethod;
+        }
+
+        public String getNote() {
+            return note;
+        }
+
+        public void setNote(String note) {
+            this.note = note;
+        }
+
+        public Integer getRedeemedPoints() {
+            return redeemedPoints;
+        }
+
+        public void setRedeemedPoints(Integer redeemedPoints) {
+            this.redeemedPoints = redeemedPoints;
+        }
+
+        public String getVoucherCode() {
+            return voucherCode;
+        }
+
+        public void setVoucherCode(String voucherCode) {
+            this.voucherCode = voucherCode;
+        }
+
+        public java.math.BigDecimal getShippingFee() {
+            return shippingFee;
+        }
+
+        public void setShippingFee(java.math.BigDecimal shippingFee) {
+            this.shippingFee = shippingFee;
+        }
+
+        public String getShippingInfo() {
+            return shippingInfo;
+        }
+
+        public void setShippingInfo(String shippingInfo) {
+            this.shippingInfo = shippingInfo;
         }
     }
 }

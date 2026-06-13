@@ -26,6 +26,10 @@ public interface CustomerMapper extends EntityMapper<CustomerDTO, Customer> {
     @BeanMapping(ignoreByDefault = true)
     @Mapping(target = "id", source = "id")
     @Mapping(target = "login", source = "login")
+    @Mapping(target = "firstName", source = "firstName")
+    @Mapping(target = "lastName", source = "lastName")
+    @Mapping(target = "email", source = "email")
+    @Mapping(target = "activated", source = "activated")
     UserDTO toDtoUserLogin(User user);
 
     @Named("productName")

@@ -106,4 +106,10 @@ public interface OrdersRepository extends JpaRepository<Orders, Long>, JpaSpecif
         org.springframework.data.domain.Pageable pageable
     );
 
+    /**
+     * Lấy đơn hàng với Customer và User để tránh LazyInitializationException.
+     */
+    @Query("SELECT o FROM Orders o LEFT JOIN FETCH o.customer c LEFT JOIN FETCH c.user WHERE o.id = :id")
+    Optional<Orders> findOneWithCustomerAndUser(@Param("id") Long id);
+
 }
