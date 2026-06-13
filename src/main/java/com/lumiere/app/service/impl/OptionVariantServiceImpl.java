@@ -16,13 +16,12 @@ import com.lumiere.app.service.dto.ProductVariantDTO;
 import com.lumiere.app.service.dto.SyncMixResult;
 import com.lumiere.app.service.mapper.OptionVariantMapper;
 import com.lumiere.app.service.mapper.ProductVariantMapper;
-import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
 import java.math.BigDecimal;
 import java.util.*;
 import java.util.stream.Collectors;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
@@ -37,36 +36,33 @@ public class OptionVariantServiceImpl implements OptionVariantService {
     private final ProductVariantMapper productVariantMapper;
 
     @Override
-  public List<OptionVariantDTO> assign(Long variantId, List<Long> optionSelectIds){
-    List<OptionVariantDTO> created = new ArrayList<>();
-    for (Long sid : optionSelectIds) {
-      if (repo.existsByProductVariant_IdAndOptionSelect_Id(variantId, sid)) continue;
-      OptionVariantDTO dto = OptionVariantDTO.builder()
-        .productVariantId(variantId)
-        .optionSelectId(sid)
-        .build();
-      OptionVariant saved = repo.save(mapper.toEntity(dto));
-      created.add(mapper.toDto(saved));
+    public List<OptionVariantDTO> assign(Long variantId, List<Long> optionSelectIds) {
+        List<OptionVariantDTO> created = new ArrayList<>();
+        for (Long sid : optionSelectIds) {
+            if (repo.existsByProductVariant_IdAndOptionSelect_Id(variantId, sid)) continue;
+            OptionVariantDTO dto = OptionVariantDTO.builder().productVariantId(variantId).optionSelectId(sid).build();
+            OptionVariant saved = repo.save(mapper.toEntity(dto));
+            created.add(mapper.toDto(saved));
+        }
+        return created;
     }
-    return created;
-  }
 
-  @Override
-  public void unassign(Long variantId, Long selectId){
-    repo.deleteByProductVariant_IdAndOptionSelect_Id(variantId, selectId);
-  }
+    @Override
+    public void unassign(Long variantId, Long selectId) {
+        repo.deleteByProductVariant_IdAndOptionSelect_Id(variantId, selectId);
+    }
 
-  @Override
-  @Transactional(readOnly = true)
-  public List<OptionVariantDTO> findByVariant(Long variantId){
-    return repo.findByProductVariant_Id(variantId).stream().map(mapper::toDto).toList();
-  }
+    @Override
+    @Transactional(readOnly = true)
+    public List<OptionVariantDTO> findByVariant(Long variantId) {
+        return repo.findByProductVariant_Id(variantId).stream().map(mapper::toDto).toList();
+    }
 
-  @Override
-  public List<OptionVariantDTO> replaceAll(Long variantId, List<Long> newSelectIds){
-    repo.findByProductVariant_Id(variantId).forEach(e -> repo.deleteById(e.getId()));
-    return assign(variantId, newSelectIds);
-  }
+    @Override
+    public List<OptionVariantDTO> replaceAll(Long variantId, List<Long> newSelectIds) {
+        repo.findByProductVariant_Id(variantId).forEach(e -> repo.deleteById(e.getId()));
+        return assign(variantId, newSelectIds);
+    }
 
     /**
      * Đồng bộ mix biến thể theo danh sách group & selectIds.
@@ -77,95 +73,88 @@ public class OptionVariantServiceImpl implements OptionVariantService {
     @Override
     @Transactional
     public SyncMixResult syncVariantMixes(Long productId, List<GroupSelectReq> groups) {
-
         // (0) Chuẩn hoá input – bỏ group trống
-        List<GroupSelectReq> normalized = groups.stream()
-            .filter(g -> g.getSelectIds() != null && !g.getSelectIds().isEmpty())
-            .toList();
+        List<GroupSelectReq> normalized = groups.stream().filter(g -> g.getSelectIds() != null && !g.getSelectIds().isEmpty()).toList();
 
         if (normalized.isEmpty()) {
             // Nếu hoàn toàn không có group nào → xoá hết variant khác
             List<ProductVariant> exists = productVariantRepository.findByProductId(productId);
             List<Long> delIds = exists.stream().map(ProductVariant::getId).toList();
-            if (!delIds.isEmpty()) productVariantRepository.deleteByIdIn(delIds);
+            if (!delIds.isEmpty()) {
+                List<OptionVariant> ovsToDelete = repo.findByProductVariant_idIn(delIds);
+                if (!ovsToDelete.isEmpty()) {
+                    repo.deleteAllInBatch(ovsToDelete);
+                }
+                productVariantRepository.deleteByIdIn(delIds);
+            }
 
-            return SyncMixResult.builder()
-                .createdVariantIds(List.of())
-                .deletedVariantIds(delIds)
-                .keptVariantIds(List.of())
-                .build();
+            return SyncMixResult.builder().createdVariantIds(List.of()).deletedVariantIds(delIds).keptVariantIds(List.of()).build();
         }
 
         // (1) Sinh cartesian mixes
-        List<List<Long>> newMixes = cartesian(
-            normalized.stream().map(GroupSelectReq::getSelectIds).toList()
-        );
+        List<List<Long>> newMixes = cartesian(normalized.stream().map(GroupSelectReq::getSelectIds).toList());
 
         // Key canonical
-        Map<String, List<Long>> newKeyToMix = newMixes.stream().collect(
-            Collectors.toMap(
-                this::keyOf,
-                mix -> mix,
-                (a, b) -> a,
-                LinkedHashMap::new
-            )
-        );
+        Map<String, List<Long>> newKeyToMix = newMixes
+            .stream()
+            .collect(Collectors.toMap(this::keyOf, mix -> mix, (a, b) -> a, LinkedHashMap::new));
         Set<String> newKeys = newKeyToMix.keySet();
 
         // (2) Load biến thể hiện có
         List<ProductVariant> existingVariants = productVariantRepository.findByProductId(productId);
         List<Long> existingIds = existingVariants.stream().map(ProductVariant::getId).toList();
 
-        List<OptionVariant> existingOV = existingIds.isEmpty()
-            ? List.of()
-            : repo.findByProductVariant_IdIn(existingIds);
+        List<OptionVariant> existingOV = existingIds.isEmpty() ? List.of() : repo.findByProductVariant_IdIn(existingIds);
 
         // Gom selectId theo variantId
         Map<Long, Set<Long>> variantToSelects = new HashMap<>();
         for (OptionVariant ov : existingOV) {
-            variantToSelects.computeIfAbsent(ov.getProductVariant().getId(), k -> new HashSet<>())
-                .add(ov.getOptionSelect().getId());
+            variantToSelects.computeIfAbsent(ov.getProductVariant().getId(), k -> new HashSet<>()).add(ov.getOptionSelect().getId());
         }
 
-        Map<String, Long> existingKeyToVariant = new HashMap<>();
+        Map<String, ProductVariant> validExistingMixes = new HashMap<>();
+        List<Long> toDeleteIds = new ArrayList<>();
+
         for (ProductVariant pv : existingVariants) {
             Set<Long> sids = variantToSelects.getOrDefault(pv.getId(), Set.of());
-            if (!sids.isEmpty()) {
-                String key = keyOf(new ArrayList<>(sids));
-                existingKeyToVariant.put(key, pv.getId());
+            if (sids.isEmpty()) {
+                toDeleteIds.add(pv.getId());
+                continue;
+            }
+            String key = keyOf(new ArrayList<>(sids));
+
+            // Nếu key này là một phần của newKeys và CHƯA có variant nào xí chỗ
+            if (newKeys.contains(key) && !validExistingMixes.containsKey(key)) {
+                validExistingMixes.put(key, pv);
+            } else {
+                // Key không hợp lệ (bị thiếu option, rác) HOẶC đã có variant khác trùng key
+                toDeleteIds.add(pv.getId());
             }
         }
 
-        // (3) Tính toCreate / toDelete / kept
+        // (3) Tính toCreate
         Set<String> toCreateKeys = new HashSet<>(newKeys);
-        toCreateKeys.removeAll(existingKeyToVariant.keySet());
-
-        Set<String> toDeleteKeys = new HashSet<>(existingKeyToVariant.keySet());
-        toDeleteKeys.removeAll(newKeys);
-
-        Set<String> keptKeys = new HashSet<>(newKeys);
-        keptKeys.retainAll(existingKeyToVariant.keySet());
+        toCreateKeys.removeAll(validExistingMixes.keySet());
 
         List<Long> createdIds = new ArrayList<>();
-        List<Long> deletedIds = new ArrayList<>();
-        List<Long> keptIds = keptKeys.stream()
-            .map(existingKeyToVariant::get)
-            .toList();
+        List<Long> keptIds = validExistingMixes.values().stream().map(ProductVariant::getId).toList();
 
-        // (4) Xoá variant thừa
-        if (!toDeleteKeys.isEmpty()) {
-            List<Long> del = toDeleteKeys.stream().map(existingKeyToVariant::get).toList();
-            if (!del.isEmpty()) {
-                productVariantRepository.deleteByIdIn(del);
-                deletedIds.addAll(del);
+        // (4) Xoá variant thừa (biến thể rác)
+        if (!toDeleteIds.isEmpty()) {
+            // Bắt buộc xoá các OptionVariant liên kết trước để tránh lỗi khoá ngoại fk_option_variant_variant
+            List<OptionVariant> ovsToDelete = repo.findByProductVariant_idIn(toDeleteIds);
+            if (!ovsToDelete.isEmpty()) {
+                repo.deleteAllInBatch(ovsToDelete);
             }
+
+            productVariantRepository.deleteByIdIn(toDeleteIds);
         }
 
         // (5) Tạo mới variant nếu có
         if (!toCreateKeys.isEmpty()) {
-
             // Load product
-            Product product = productRepository.findById(productId)
+            Product product = productRepository
+                .findById(productId)
                 .orElseThrow(() -> new IllegalArgumentException("Product not found: " + productId));
 
             // Lấy toàn bộ OptionSelect cần dùng
@@ -173,8 +162,7 @@ public class OptionVariantServiceImpl implements OptionVariantService {
             for (String k : toCreateKeys) allSelectIds.addAll(newKeyToMix.get(k));
 
             List<OptionSelect> allSelects = optionSelectRepository.findAllByIdIn(allSelectIds);
-            Map<Long, OptionSelect> selectMap = allSelects.stream()
-                .collect(Collectors.toMap(OptionSelect::getId, s -> s));
+            Map<Long, OptionSelect> selectMap = allSelects.stream().collect(Collectors.toMap(OptionSelect::getId, s -> s));
 
             // Tạo ProductVariant (chưa flush)
             List<ProductVariant> newVariants = new ArrayList<>();
@@ -220,13 +208,8 @@ public class OptionVariantServiceImpl implements OptionVariantService {
             if (!newOV.isEmpty()) repo.saveAll(newOV);
         }
 
-        return SyncMixResult.builder()
-            .createdVariantIds(createdIds)
-            .deletedVariantIds(deletedIds)
-            .keptVariantIds(keptIds)
-            .build();
+        return SyncMixResult.builder().createdVariantIds(createdIds).deletedVariantIds(toDeleteIds).keptVariantIds(keptIds).build();
     }
-
 
     // ==== Helpers ====
 
@@ -291,42 +274,39 @@ public class OptionVariantServiceImpl implements OptionVariantService {
         Set<Long> targetSet = new HashSet<>(selectOptions);
 
         // 1) Lấy tất cả OptionVariant có selectId thuộc targetSet
-        List<OptionVariant> candidateMappings =
-            repo.findByOptionSelect_IdIn(targetSet);
+        List<OptionVariant> candidateMappings = repo.findByOptionSelect_IdIn(targetSet);
 
         if (candidateMappings.isEmpty()) {
             return null;
         }
 
         // 2) Lấy danh sách variantId ứng viên
-        Set<Long> candidateVariantIds = candidateMappings.stream()
-            .map(ov -> ov.getProductVariant().getId())
-            .collect(Collectors.toSet());
+        Set<Long> candidateVariantIds = candidateMappings.stream().map(ov -> ov.getProductVariant().getId()).collect(Collectors.toSet());
 
         if (candidateVariantIds.isEmpty()) {
             return null;
         }
 
         // 3) Lấy TẤT CẢ mapping của các variant ứng viên
-        List<OptionVariant> allMappingsForCandidates =
-            repo.findByProductVariant_idIn(candidateVariantIds);
+        List<OptionVariant> allMappingsForCandidates = repo.findByProductVariant_idIn(candidateVariantIds);
 
         // 4) Gom thành: variantId -> set<selectId>
-        Map<Long, Set<Long>> variantToSelectIds = allMappingsForCandidates.stream()
-            .collect(Collectors.groupingBy(
-                ov -> ov.getProductVariant().getId(),
-                Collectors.mapping(
-                    ov -> ov.getOptionSelect().getId(),
-                    Collectors.toSet()
+        Map<Long, Set<Long>> variantToSelectIds = allMappingsForCandidates
+            .stream()
+            .collect(
+                Collectors.groupingBy(
+                    ov -> ov.getProductVariant().getId(),
+                    Collectors.mapping(ov -> ov.getOptionSelect().getId(), Collectors.toSet())
                 )
-            ));
+            );
 
         // 5) Tìm variant có selectIds == targetSet (exact match)
-        Long matchedVariantId = variantToSelectIds.entrySet().stream()
+        Long matchedVariantId = variantToSelectIds
+            .entrySet()
+            .stream()
             .filter(e -> {
                 Set<Long> variantSet = e.getValue();
-                return variantSet.size() == targetSet.size()
-                    && variantSet.containsAll(targetSet);
+                return variantSet.size() == targetSet.size() && variantSet.containsAll(targetSet);
             })
             .map(Map.Entry::getKey)
             .findFirst()
@@ -336,8 +316,7 @@ public class OptionVariantServiceImpl implements OptionVariantService {
             return null;
         }
 
-        ProductVariant variant = productVariantRepository.findById(matchedVariantId)
-            .orElse(null);
+        ProductVariant variant = productVariantRepository.findById(matchedVariantId).orElse(null);
 
         if (variant == null) {
             return null;
@@ -345,5 +324,4 @@ public class OptionVariantServiceImpl implements OptionVariantService {
 
         return productVariantMapper.toDto(variant);
     }
-
 }
