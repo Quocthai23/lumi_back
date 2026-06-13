@@ -239,6 +239,7 @@ public class VoucherResource {
             VoucherCalculateResponseDTO response = voucherService.calculateDiscount(request, customerId);
             return ResponseEntity.ok().body(response);
         } catch (IllegalArgumentException e) {
+            e.printStackTrace();
             throw new BadRequestAlertException(e.getMessage(), ENTITY_NAME, "voucherinvalid");
         }
     }

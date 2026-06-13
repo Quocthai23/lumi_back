@@ -105,11 +105,7 @@ public class OrdersServiceImpl implements OrdersService {
         VoucherService voucherService,
         ProductVariantMapper productVariantMapper,
         KafkaTemplate<String, Object> kafkaTemplate,
-        InventoryRepository inventoryRepository, ProductMapper productMapper, ProductService productService,
-        NotificationProducerService notificationProducerService,
-        OrderStockProducerService orderStockProducerService,
-        OrderStockRestoreService orderStockRestoreService,
-        FlashSaleProductService flashSaleProductService) {
+        InventoryRepository inventoryRepository, ProductMapper productMapper, ProductService productService, ProductVariantService productVariantService) {
         this.ordersRepository = ordersRepository;
         this.ordersMapper = ordersMapper;
         this.customerService = customerService;
@@ -390,162 +386,23 @@ public class OrdersServiceImpl implements OrdersService {
             setAllBorders(sHdr, BorderStyle.THIN);
             sHdr.setAlignment(HorizontalAlignment.CENTER);
 
-            CellStyle sText = wb.createCellStyle();
-            setAllBorders(sText, BorderStyle.THIN);
+        for (CartItem cartItem : cartItems) {
+            ProductVariant variant = productVariantRepository.findById(cartItem.getVariantId())
+                .orElseThrow(() -> new IllegalArgumentException("Product variant not found: " + cartItem.getVariantId()));
 
-            CellStyle sDate = wb.createCellStyle();
-            setAllBorders(sDate, BorderStyle.THIN);
-            sDate.setDataFormat(wb.createDataFormat().getFormat("dd/MM/yyyy HH:mm"));
-
-            CellStyle sMoney = wb.createCellStyle();
-            setAllBorders(sMoney, BorderStyle.THIN);
-            sMoney.setDataFormat(wb.createDataFormat().getFormat("#,##0 \"₫\""));
-
-            Sheet sheet = wb.createSheet("Danh sách đơn hàng");
-            int r = 0;
-
-            // ===== Tiêu đề =====
-            Row titleRow = sheet.createRow(r++);
-            Cell titleCell = titleRow.createCell(0);
-            titleCell.setCellValue("DANH SÁCH ĐƠN HÀNG");
-            titleCell.setCellStyle(sTitle);
-            sheet.addMergedRegion(new org.apache.poi.ss.util.CellRangeAddress(0, 0, 0, 7));
-
-            r++; // Dòng trống
-
-            // ===== Header bảng =====
-            Row headerRow = sheet.createRow(r++);
-            String[] headers = {
-                "Mã Đơn Hàng",
-                "Ngày Đặt",
-                "Khách Hàng",
-                "Trạng Thái",
-                "Thanh Toán",
-                "Phương Thức Thanh Toán",
-                "Tổng Tiền",
-                "Ghi Chú"
-            };
-            
-            for (int i = 0; i < headers.length; i++) {
-                Cell cell = headerRow.createCell(i);
-                cell.setCellValue(headers[i]);
-                cell.setCellStyle(sHdr);
+            if (variant.getStockQuantity() - cartItem.getQuantity() < 0) {
+                throw new IllegalArgumentException(
+                    "Không thể trừ đủ số lượng cho sản phẩm " + variant.getSku() + ". Vui lòng thử lại."
+                );
             }
 
-            // ===== Dữ liệu đơn hàng =====
-            for (OrdersDTO order : ordersDTO) {
-                Row row = sheet.createRow(r++);
-                
-                // Mã đơn hàng
-                Cell cell0 = row.createCell(0);
-                cell0.setCellValue(safe(order.getCode()));
-                cell0.setCellStyle(sText);
-                
-                // Ngày đặt
-                Cell cell1 = row.createCell(1);
-                if (order.getPlacedAt() != null) {
-                    cell1.setCellValue(order.getPlacedAt().atZone(ZoneId.systemDefault()).toLocalDateTime());
-                    cell1.setCellStyle(sDate);
-                } else {
-                    cell1.setCellValue("");
-                    cell1.setCellStyle(sText);
-                }
-                
-                // Khách hàng
-                Cell cell2 = row.createCell(2);
-                String customerName = "Khách vãng lai";
-                if (order.getCustomer() != null) {
-                    try {
-                        String firstName = safe((String) order.getCustomer().getClass().getMethod("getFirstName").invoke(order.getCustomer()));
-                        String lastName = safe((String) order.getCustomer().getClass().getMethod("getLastName").invoke(order.getCustomer()));
-                        customerName = (firstName + " " + lastName).trim();
-                        if (customerName.isEmpty()) {
-                            customerName = "Khách vãng lai";
-                        }
-                    } catch (Exception ignore) {
-                        customerName = "Khách vãng lai";
-                    }
-                }
-                cell2.setCellValue(customerName);
-                cell2.setCellStyle(sText);
-                
-                // Trạng thái
-                Cell cell3 = row.createCell(3);
-                cell3.setCellValue(safe(order.getStatus() != null ? order.getStatus().toString() : ""));
-                cell3.setCellStyle(sText);
-                
-                // Thanh toán
-                Cell cell4 = row.createCell(4);
-                cell4.setCellValue(safe(order.getPaymentStatus() != null ? order.getPaymentStatus().toString() : ""));
-                cell4.setCellStyle(sText);
-                
-                // Phương thức thanh toán
-                Cell cell5 = row.createCell(5);
-                cell5.setCellValue(safe(order.getPaymentMethod()));
-                cell5.setCellStyle(sText);
-                
-                // Tổng tiền
-                Cell cell6 = row.createCell(6);
-                if (order.getTotalAmount() != null) {
-                    cell6.setCellValue(order.getTotalAmount().longValue());
-                    cell6.setCellStyle(sMoney);
-                } else {
-                    cell6.setCellValue(0);
-                    cell6.setCellStyle(sMoney);
-                }
-                
-                // Ghi chú
-                Cell cell7 = row.createCell(7);
-                cell7.setCellValue(safe(order.getNote()));
-                cell7.setCellStyle(sText);
-            }
-
-            // ===== Auto-fit columns =====
-            for (int i = 0; i < headers.length; i++) {
-                sheet.autoSizeColumn(i);
-                // Tăng độ rộng một chút để dễ đọc
-                sheet.setColumnWidth(i, sheet.getColumnWidth(i) + 1000);
-            }
-
-            // ===== Stream về client =====
-            String filename = URLEncoder.encode("danh_sach_don_hang_" + 
-                DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss").format(Instant.now().atZone(ZoneId.systemDefault())) + 
-                ".xlsx", StandardCharsets.UTF_8);
-            response.setHeader("Content-Disposition", "attachment; filename*=UTF-8''" + filename);
-            response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-            try (ServletOutputStream os = response.getOutputStream()) {
-                wb.write(os);
-                os.flush();
-            }
-        } catch (Exception e) {
-            LOG.error("Error exporting orders to Excel", e);
-            throw new RuntimeException("Export orders error", e);
-        }
-    }
-
-    @Override
-    @Transactional
-    public OrdersDTO createOrderFromCart(String paymentMethod, String note, Integer redeemedPoints, String voucherCode, BigDecimal shippingCost, String shippingInfo) {
-        // Lấy userId từ SecurityContext
-        Long userId = SecurityUtils.getCurrentUserId()
-            .orElseThrow(() -> new IllegalArgumentException("User not authenticated"));
-
-        LOG.debug("Request to create order from cart for user: {} with voucher: {}", userId, voucherCode);
-
-        // Lấy customer từ userId
-        Customer customer = customerRepository.findByUserId(userId)
-            .orElseThrow(() -> new IllegalArgumentException("Customer not found for user: " + userId));
-
-        // Lấy tất cả items trong giỏ hàng
-        List<CartItem> cartItems = cartItemRepository.findAllByCustomerId(userId);
-        if (cartItems.isEmpty()) {
-            throw new IllegalArgumentException("Cart is empty");
+            variant.setStockQuantity(variant.getStockQuantity() - cartItem.getQuantity());
+            variant = productVariantRepository.save(variant);
         }
 
         // Tạo mã đơn hàng duy nhất
         String orderCode = generateOrderCode();
 
-        // Tính tổng tiền sản phẩm (có tính giá flash sale nếu có) và discount từ flash sale
         BigDecimal subtotal = BigDecimal.ZERO;
         BigDecimal flashSaleDiscount = BigDecimal.ZERO;
         for (CartItem cartItem : cartItems) {
@@ -687,6 +544,11 @@ public class OrdersServiceImpl implements OrdersService {
         order.setTotalAmount(totalAmount.add(shippingCost));
         order.setNote(note);
         order.setPaymentMethod(paymentMethod);
+
+        if(paymentMethod.equals("COD")){
+            order.setStatus(OrderStatus.CONFIRMED);
+        }
+
         order.setPlacedAt(Instant.now());
         order.setRedeemedPoints(redeemedPoints != null ? redeemedPoints : 0);
         order.setDiscountAmount(discountAmount);
