@@ -3,7 +3,6 @@ package com.lumiere.app.domain;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.lumiere.app.domain.enumeration.OrderStatus;
 import com.lumiere.app.domain.enumeration.PaymentStatus;
-import com.lumiere.app.domain.Voucher;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
 import java.io.Serializable;

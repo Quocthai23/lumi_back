@@ -4,22 +4,28 @@ package com.lumiere.app.domain;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import java.io.Serializable;
 import lombok.*;
 
-import java.io.Serializable;
-
 @Entity
-@Table(name = "option_select",
-       uniqueConstraints = @UniqueConstraint(name = "uk_option_select_group_code", columnNames = {"option_group_id","code"}))
-@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
+@Table(
+    name = "option_select",
+    uniqueConstraints = @UniqueConstraint(name = "uk_option_select_group_code", columnNames = { "option_group_id", "code" })
+)
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
 public class OptionSelect implements Serializable {
-    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @NotNull
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "option_group_id", nullable = false,
-        foreignKey = @ForeignKey(name = "fk_option_select_group"))
+    @JoinColumn(name = "option_group_id", nullable = false, foreignKey = @ForeignKey(name = "fk_option_select_group"))
     private OptionGroup optionGroup;
 
     @NotBlank
@@ -35,5 +41,6 @@ public class OptionSelect implements Serializable {
     private Integer position;
 
     @Column(name = "active", nullable = false)
+    @Builder.Default
     private Boolean active = Boolean.TRUE;
 }

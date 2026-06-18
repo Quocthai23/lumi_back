@@ -2,7 +2,6 @@ package com.lumiere.app.repository;
 
 import com.lumiere.app.domain.OptionVariant;
 import com.lumiere.app.domain.ProductVariant;
-
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -47,4 +46,32 @@ public interface ProductVariantRepository extends JpaRepository<ProductVariant, 
     void deleteByIdIn(Collection<Long> ids);
 
     List<ProductVariant> findAllByIdIn(Collection<Long> ids);
+
+    @Modifying
+    @Query(value = "DELETE FROM option_variant WHERE product_variant_id = :id", nativeQuery = true)
+    void deleteOptionVariantsByVariantId(@Param("id") Long id);
+
+    @Modifying
+    @Query(value = "DELETE FROM cart_item WHERE variant_id = :id", nativeQuery = true)
+    void deleteCartItemsByVariantId(@Param("id") Long id);
+
+    @Modifying
+    @Query(value = "UPDATE order_item SET product_variant_id = NULL WHERE product_variant_id = :id", nativeQuery = true)
+    void unlinkOrderItemsByVariantId(@Param("id") Long id);
+
+    @Modifying
+    @Query(value = "DELETE FROM inventory WHERE product_variant_id = :id", nativeQuery = true)
+    void deleteInventoryByVariantId(@Param("id") Long id);
+
+    @Modifying
+    @Query(value = "DELETE FROM stock_movement WHERE product_variant_id = :id", nativeQuery = true)
+    void deleteStockMovementByVariantId(@Param("id") Long id);
+
+    @Modifying
+    @Query(value = "DELETE FROM stock_notification WHERE product_variant_id = :id", nativeQuery = true)
+    void deleteStockNotificationByVariantId(@Param("id") Long id);
+
+    @Modifying
+    @Query(value = "DELETE FROM flash_sale_product WHERE product_variant_id = :id", nativeQuery = true)
+    void deleteFlashSaleProductByVariantId(@Param("id") Long id);
 }

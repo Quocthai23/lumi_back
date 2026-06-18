@@ -11,17 +11,16 @@ import com.lumiere.app.service.dto.ProductVariantDTO;
 import com.lumiere.app.service.mapper.CartItemMapper;
 import com.lumiere.app.service.mapper.ProductVariantMapper;
 import com.lumiere.app.utils.MergeUtils;
+import java.math.BigDecimal;
+import java.time.Instant;
+import java.util.*;
+import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.math.BigDecimal;
-import java.time.Instant;
-import java.util.*;
-import java.util.stream.Collectors;
 
 @Service
 @Transactional
@@ -37,9 +36,9 @@ public class CartItemServiceImpl implements CartItemService {
     private final FlashSaleProductService flashSaleProductService;
 
     public CartItemServiceImpl(
-        CartItemRepository cartItemRepository, 
-        CartItemMapper cartItemMapper, 
-        ProductVariantRepository productVariantRepository, 
+        CartItemRepository cartItemRepository,
+        CartItemMapper cartItemMapper,
+        ProductVariantRepository productVariantRepository,
         ProductVariantMapper productVariantMapper,
         FlashSaleProductService flashSaleProductService
     ) {
@@ -56,8 +55,7 @@ public class CartItemServiceImpl implements CartItemService {
 
         // Tính totalPrice nếu chưa set hoặc muốn luôn sync
         if (cartItemDTO.getQuantity() != null && cartItemDTO.getUnitPrice() != null) {
-            BigDecimal total = cartItemDTO.getUnitPrice()
-                .multiply(BigDecimal.valueOf(cartItemDTO.getQuantity()));
+            BigDecimal total = cartItemDTO.getUnitPrice().multiply(BigDecimal.valueOf(cartItemDTO.getQuantity()));
             cartItemDTO.setTotalPrice(total);
         }
 
@@ -81,12 +79,10 @@ public class CartItemServiceImpl implements CartItemService {
             throw new IllegalArgumentException();
         }
 
-
         cartItemDTO.setCustomerId(exist.get().getCustomerId());
 
         if (cartItemDTO.getQuantity() != null && cartItemDTO.getUnitPrice() != null) {
-            BigDecimal total = cartItemDTO.getUnitPrice()
-                .multiply(BigDecimal.valueOf(cartItemDTO.getQuantity()));
+            BigDecimal total = cartItemDTO.getUnitPrice().multiply(BigDecimal.valueOf(cartItemDTO.getQuantity()));
             cartItemDTO.setTotalPrice(total);
         }
 
@@ -128,8 +124,7 @@ public class CartItemServiceImpl implements CartItemService {
 
                 // Nếu không gửi totalPrice nhưng có quantity + unitPrice thì auto tính
                 if (existing.getQuantity() != null && existing.getUnitPrice() != null) {
-                    BigDecimal total = existing.getUnitPrice()
-                        .multiply(BigDecimal.valueOf(existing.getQuantity()));
+                    BigDecimal total = existing.getUnitPrice().multiply(BigDecimal.valueOf(existing.getQuantity()));
                     existing.setTotalPrice(total);
                 }
 
@@ -172,53 +167,54 @@ public class CartItemServiceImpl implements CartItemService {
         List<CartItem> items = cartItemRepository.findAllByCustomerId(customerId);
         if (items.isEmpty()) return Collections.emptyList();
 
-        Set<Long> variantIds = items.stream()
-            .map(CartItem::getVariantId)
-            .filter(Objects::nonNull)
-            .collect(Collectors.toSet());
+        Set<Long> variantIds = items.stream().map(CartItem::getVariantId).filter(Objects::nonNull).collect(Collectors.toSet());
 
-        List<ProductVariantDTO> variants = productVariantRepository.findAllByIdIn(variantIds).stream().map(productVariantMapper::toDto).toList();
-        Map<Long, ProductVariantDTO> variantById = variants.stream()
-            .collect(Collectors.toMap(ProductVariantDTO::getId, v -> v));
+        List<ProductVariantDTO> variants = productVariantRepository
+            .findAllByIdIn(variantIds)
+            .stream()
+            .map(productVariantMapper::toDto)
+            .toList();
+        Map<Long, ProductVariantDTO> variantById = variants.stream().collect(Collectors.toMap(ProductVariantDTO::getId, v -> v));
 
         // Set promotionPrice từ FlashSaleProduct cho mỗi variant
-        variantById.values().forEach(dto -> {
-            if (dto.getId() != null) {
-                flashSaleProductService.findActiveByProductVariantId(dto.getId())
-                    .ifPresent(flashSaleProduct -> {
-                        dto.setPromotionPrice(flashSaleProduct.getSalePrice());
-                    });
-            }
-        });
+        variantById
+            .values()
+            .forEach(dto -> {
+                if (dto.getId() != null) {
+                    flashSaleProductService
+                        .findActiveByProductVariantId(dto.getId())
+                        .ifPresent(flashSaleProduct -> {
+                            dto.setPromotionPrice(flashSaleProduct.getSalePrice());
+                        });
+                }
+            });
 
-        return items.stream()
+        return items
+            .stream()
             .map(item -> {
                 CartItemDTO dto = cartItemMapper.toDto(item);
                 dto.setVariant(variantById.get(item.getVariantId()));
                 return dto;
             })
+            .filter(dto -> dto.getVariant() != null) // Lọc bỏ các sản phẩm rác (đã bị xóa ở bảng variant nhưng cart item chưa bị xóa)
             .collect(Collectors.toList());
     }
 
     @Override
-    public CartItemDTO findByCustomerIdAndVariantId(Long customerId, Long variantId){
-        return cartItemMapper.toDto(cartItemRepository.findCartItemByCustomerIdAndVariantId(customerId,variantId));
+    public CartItemDTO findByCustomerIdAndVariantId(Long customerId, Long variantId) {
+        return cartItemMapper.toDto(cartItemRepository.findCartItemByCustomerIdAndVariantId(customerId, variantId));
     }
 
     @Override
-    public CartItemDTO createCartItem(CartItemDTO cartItemDTO, Long userId){
-
+    public CartItemDTO createCartItem(CartItemDTO cartItemDTO, Long userId) {
         CartItemDTO exist = this.findByCustomerIdAndVariantId(cartItemDTO.getVariantId(), userId);
 
-        if(exist != null){
-
-            MergeUtils.Options opts = new MergeUtils.Options()
-                .overwriteNulls(false)
-                .replaceCollections(false);
-            MergeUtils.merge(exist,cartItemDTO,opts);
+        if (exist != null) {
+            MergeUtils.Options opts = new MergeUtils.Options().overwriteNulls(false).replaceCollections(false);
+            MergeUtils.merge(exist, cartItemDTO, opts);
 
             exist = this.save(exist);
-        }else{
+        } else {
             cartItemDTO.setCustomerId(userId);
             cartItemDTO.setCreatedDate(Instant.now());
             cartItemDTO.setLastModifiedDate(Instant.now());

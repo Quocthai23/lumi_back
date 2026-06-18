@@ -4,25 +4,31 @@ package com.lumiere.app.domain;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-import lombok.*;
-
 import java.io.Serializable;
 import java.util.LinkedHashSet;
 import java.util.Set;
+import lombok.*;
 
 @Entity
-@Table(name = "option_group",
-       uniqueConstraints = @UniqueConstraint(name = "uk_option_group_product_code", columnNames = {"product_id","code"}))
-@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
+@Table(
+    name = "option_group",
+    uniqueConstraints = @UniqueConstraint(name = "uk_option_group_product_code", columnNames = { "product_id", "code" })
+)
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
 public class OptionGroup implements Serializable {
-    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     /** Thuộc product nào */
     @NotNull
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "product_id", nullable = false,
-        foreignKey = @ForeignKey(name = "fk_option_group_product"))
+    @JoinColumn(name = "product_id", nullable = false, foreignKey = @ForeignKey(name = "fk_option_group_product"))
     private Product product;
 
     @NotBlank
@@ -43,5 +49,6 @@ public class OptionGroup implements Serializable {
 
     @OneToMany(mappedBy = "optionGroup", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("position ASC, id ASC")
+    @Builder.Default
     private Set<OptionSelect> selects = new LinkedHashSet<>();
 }

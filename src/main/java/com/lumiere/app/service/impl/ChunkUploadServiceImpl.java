@@ -1,23 +1,11 @@
 package com.lumiere.app.service.impl;
 
-import com.google.cloud.storage.BlobId;
-import com.google.cloud.storage.BlobInfo;
-import com.google.cloud.storage.Storage;
-import com.google.firebase.cloud.StorageClient;
 import com.lumiere.app.service.AttachmentService;
 import com.lumiere.app.service.ChunkUploadService;
 import com.lumiere.app.service.dto.AttachmentDTO;
-import com.lumiere.app.utils.Const;
 import com.lumiere.app.utils.PublicUrlBuilder;
-import org.springframework.mock.web.MockMultipartFile;
-import org.springframework.stereotype.Service;
-import org.springframework.util.FileSystemUtils;
-import org.springframework.web.multipart.MultipartFile;
-
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.OutputStream;
-import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -25,7 +13,9 @@ import java.nio.file.StandardOpenOption;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.concurrent.TimeUnit;
+import org.springframework.stereotype.Service;
+import org.springframework.util.FileSystemUtils;
+import org.springframework.web.multipart.MultipartFile;
 
 @Service
 public class ChunkUploadServiceImpl implements ChunkUploadService {
@@ -70,9 +60,9 @@ public class ChunkUploadServiceImpl implements ChunkUploadService {
         }
 
         // 2) Tên file an toàn + đuôi
-        String ext = guessExtension(originalFileName);         // .jpg/.png/... hoặc ".bin"
-        String safeName = UUID.randomUUID() + ext;             // tên mới, tránh path traversal
-        Path finalDir  = mediaRoot.resolve("attachments");     // <-- KHÔNG đặt dưới tmp
+        String ext = guessExtension(originalFileName); // .jpg/.png/... hoặc ".bin"
+        String safeName = UUID.randomUUID() + ext; // tên mới, tránh path traversal
+        Path finalDir = mediaRoot.resolve("attachments"); // <-- KHÔNG đặt dưới tmp
         Files.createDirectories(finalDir);
 
         Path finalFile = finalDir.resolve(safeName).normalize();
@@ -82,8 +72,14 @@ public class ChunkUploadServiceImpl implements ChunkUploadService {
 
         // 3) Gộp qua file .part rồi move ATOMIC
         Path staging = finalDir.resolve(safeName + ".part").normalize();
-        try (OutputStream os = Files.newOutputStream(
-            staging, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE)) {
+        try (
+            OutputStream os = Files.newOutputStream(
+                staging,
+                StandardOpenOption.CREATE,
+                StandardOpenOption.TRUNCATE_EXISTING,
+                StandardOpenOption.WRITE
+            )
+        ) {
             for (int i = 0; i < totalChunks; i++) {
                 Files.copy(uploadDir.resolve(String.valueOf(i)), os);
             }
@@ -94,20 +90,21 @@ public class ChunkUploadServiceImpl implements ChunkUploadService {
         Files.move(staging, finalFile, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
 
         // 4) Metadata
-        String contentType = Optional.ofNullable(Files.probeContentType(finalFile))
-            .orElseGet(() -> mimeFromExt(ext));
+        String contentType = Optional.ofNullable(Files.probeContentType(finalFile)).orElseGet(() -> mimeFromExt(ext));
         long size = Files.size(finalFile);
 
         // 5) Tạo DTO + URL tuyệt đối (domain)
         AttachmentDTO dto = new AttachmentDTO();
         dto.setName(safeName);
-        dto.setUrl(urlBuilder.media(safeName));  // ví dụ: https://your-domain.com/api/media/<safeName>
+        dto.setUrl(urlBuilder.media(safeName)); // ví dụ: https://your-domain.com/api/media/<safeName>
         dto.setContentType(contentType);
         dto.setSize(size);
         dto.setUploadedAt(Instant.now());
 
         // 6) Dọn rác tạm
-        try { FileSystemUtils.deleteRecursively(uploadDir); } catch (Exception ignore) {}
+        try {
+            FileSystemUtils.deleteRecursively(uploadDir);
+        } catch (Exception ignore) {}
 
         // 7) Lưu DB
         return attachmentService.save(dto);
@@ -140,5 +137,4 @@ public class ChunkUploadServiceImpl implements ChunkUploadService {
             default -> "application/octet-stream";
         };
     }
-
 }

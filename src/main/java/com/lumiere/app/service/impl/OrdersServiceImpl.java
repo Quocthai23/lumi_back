@@ -11,14 +11,19 @@ import com.lumiere.app.domain.enumeration.ReviewStatus;
 import com.lumiere.app.repository.*;
 import com.lumiere.app.security.SecurityUtils;
 import com.lumiere.app.service.*;
+import com.lumiere.app.service.FlashSaleProductService;
+import com.lumiere.app.service.OrderStockRestoreService;
 import com.lumiere.app.service.dto.*;
+import com.lumiere.app.service.dto.OrderStockProcessingMessage;
 import com.lumiere.app.service.kafka.NotificationProducerService;
 import com.lumiere.app.service.kafka.OrderStockProducerService;
-import com.lumiere.app.service.OrderStockRestoreService;
 import com.lumiere.app.service.mapper.OrderStatusHistoryMapper;
 import com.lumiere.app.service.mapper.OrdersMapper;
-import com.lumiere.app.service.dto.OrderStockProcessingMessage;
-
+import com.lumiere.app.service.mapper.ProductMapper;
+import com.lumiere.app.service.mapper.ProductVariantMapper;
+import com.lumiere.app.utils.RatingUtils;
+import jakarta.servlet.ServletOutputStream;
+import jakarta.servlet.http.HttpServletResponse;
 import java.math.BigDecimal;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -31,13 +36,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
-
-import com.lumiere.app.service.mapper.ProductMapper;
-import com.lumiere.app.service.mapper.ProductVariantMapper;
-import com.lumiere.app.service.FlashSaleProductService;
-import com.lumiere.app.utils.RatingUtils;
-import jakarta.servlet.ServletOutputStream;
-import jakarta.servlet.http.HttpServletResponse;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.slf4j.Logger;
@@ -59,10 +57,13 @@ public class OrdersServiceImpl implements OrdersService {
 
     private final OrdersRepository ordersRepository;
     private final OrdersMapper ordersMapper;
+
     @SuppressWarnings("unused")
     private final CustomerService customerService;
+
     @SuppressWarnings("unused")
     private final OrdersQueryService ordersQueryService;
+
     private final OrderItemService orderItemService;
     private final CartItemRepository cartItemRepository;
     private final ProductVariantRepository productVariantRepository;
@@ -70,8 +71,10 @@ public class OrdersServiceImpl implements OrdersService {
     private final OrderStatusHistoryRepository orderStatusHistoryRepository;
     private final OrderStatusHistoryMapper orderStatusHistoryMapper;
     private final CustomerRepository customerRepository;
+
     @SuppressWarnings("unused")
     private final ProductReviewService productReviewService;
+
     private final ProductReviewRepository productReviewRepository;
     private final ProductRepository productRepository;
     private final LoyaltyTransactionRepository loyaltyTransactionRepository;
@@ -105,11 +108,14 @@ public class OrdersServiceImpl implements OrdersService {
         VoucherService voucherService,
         ProductVariantMapper productVariantMapper,
         KafkaTemplate<String, Object> kafkaTemplate,
-        InventoryRepository inventoryRepository, ProductMapper productMapper, ProductService productService,
+        InventoryRepository inventoryRepository,
+        ProductMapper productMapper,
+        ProductService productService,
         NotificationProducerService notificationProducerService,
         OrderStockProducerService orderStockProducerService,
         OrderStockRestoreService orderStockRestoreService,
-        FlashSaleProductService flashSaleProductService) {
+        FlashSaleProductService flashSaleProductService
+    ) {
         this.ordersRepository = ordersRepository;
         this.ordersMapper = ordersMapper;
         this.customerService = customerService;
@@ -187,7 +193,7 @@ public class OrdersServiceImpl implements OrdersService {
         });
 
         return ordersDTO;
-   }
+    }
 
     @Override
     public void delete(Long id) {
@@ -197,32 +203,40 @@ public class OrdersServiceImpl implements OrdersService {
 
     @Override
     public void writeOrderInvoiceExcel(Long orderId, HttpServletResponse response) {
-        OrdersDTO order = this.findOne(orderId)
-            .orElseThrow(() -> new IllegalArgumentException("Order not found: " + orderId));
+        OrdersDTO order = this.findOne(orderId).orElseThrow(() -> new IllegalArgumentException("Order not found: " + orderId));
         List<OrderItemDTO> items = orderItemService.findAllByOrderId(orderId);
 
         try (Workbook wb = new XSSFWorkbook()) {
             // ====== Styles ======
-            Font fTitle = wb.createFont(); fTitle.setBold(true); fTitle.setFontHeightInPoints((short)16);
-            CellStyle sTitle = wb.createCellStyle(); sTitle.setFont(fTitle);
+            Font fTitle = wb.createFont();
+            fTitle.setBold(true);
+            fTitle.setFontHeightInPoints((short) 16);
+            CellStyle sTitle = wb.createCellStyle();
+            sTitle.setFont(fTitle);
 
-            Font fHdr = wb.createFont(); fHdr.setBold(true);
+            Font fHdr = wb.createFont();
+            fHdr.setBold(true);
             CellStyle sHdr = wb.createCellStyle();
             sHdr.setFont(fHdr);
             sHdr.setFillForegroundColor(IndexedColors.GREY_25_PERCENT.getIndex());
             sHdr.setFillPattern(FillPatternType.SOLID_FOREGROUND);
             setAllBorders(sHdr, BorderStyle.THIN);
 
-            CellStyle sText = wb.createCellStyle(); setAllBorders(sText, BorderStyle.THIN);
+            CellStyle sText = wb.createCellStyle();
+            setAllBorders(sText, BorderStyle.THIN);
 
-            CellStyle sInt  = wb.createCellStyle(); setAllBorders(sInt, BorderStyle.THIN);
+            CellStyle sInt = wb.createCellStyle();
+            setAllBorders(sInt, BorderStyle.THIN);
             sInt.setDataFormat(wb.createDataFormat().getFormat("#,##0"));
 
-            CellStyle sMoney = wb.createCellStyle(); setAllBorders(sMoney, BorderStyle.THIN);
+            CellStyle sMoney = wb.createCellStyle();
+            setAllBorders(sMoney, BorderStyle.THIN);
             sMoney.setDataFormat(wb.createDataFormat().getFormat("#,##0 \"₫\""));
 
-            Font fBold = wb.createFont(); fBold.setBold(true);
-            CellStyle sMoneyBold = wb.createCellStyle(); setAllBorders(sMoneyBold, BorderStyle.THIN);
+            Font fBold = wb.createFont();
+            fBold.setBold(true);
+            CellStyle sMoneyBold = wb.createCellStyle();
+            setAllBorders(sMoneyBold, BorderStyle.THIN);
             sMoneyBold.setFont(fBold);
             sMoneyBold.setDataFormat(wb.createDataFormat().getFormat("#,##0 \"₫\""));
 
@@ -238,8 +252,7 @@ public class OrdersServiceImpl implements OrdersService {
 
             Row row1 = sheet.createRow(r++);
             String createdAt = order.getPlacedAt() != null
-                ? DateTimeFormatter.ofPattern("HH:mm:ss dd/MM/yyyy")
-                .format(order.getPlacedAt().atZone(ZoneId.systemDefault()))
+                ? DateTimeFormatter.ofPattern("HH:mm:ss dd/MM/yyyy").format(order.getPlacedAt().atZone(ZoneId.systemDefault()))
                 : "";
             row1.createCell(0).setCellValue(createdAt);
 
@@ -254,7 +267,7 @@ public class OrdersServiceImpl implements OrdersService {
 
             // ===== Header bảng items =====
             Row hdr = sheet.createRow(r++);
-            String[] cols = {"Sản phẩm", "SKU", "Số lượng", "Đơn giá", "Tổng"};
+            String[] cols = { "Sản phẩm", "SKU", "Số lượng", "Đơn giá", "Tổng" };
             for (int i = 0; i < cols.length; i++) {
                 Cell hc = hdr.createCell(i);
                 hc.setCellValue(cols[i]);
@@ -267,20 +280,30 @@ public class OrdersServiceImpl implements OrdersService {
                     Row rr = sheet.createRow(r++);
 
                     String pvName = it.getProductVariant() != null ? safe(it.getProductVariant().getName()) : "";
-                    String pvSku  = it.getProductVariant() != null ? safe(it.getProductVariant().getSku())  : "";
+                    String pvSku = it.getProductVariant() != null ? safe(it.getProductVariant().getSku()) : "";
 
                     // Tên
-                    Cell a = rr.createCell(0); a.setCellValue(pvName); a.setCellStyle(sText);
+                    Cell a = rr.createCell(0);
+                    a.setCellValue(pvName);
+                    a.setCellStyle(sText);
                     // SKU
-                    Cell b = rr.createCell(1); b.setCellValue(pvSku);  b.setCellStyle(sText);
+                    Cell b = rr.createCell(1);
+                    b.setCellValue(pvSku);
+                    b.setCellStyle(sText);
                     // Số lượng
-                    Cell c = rr.createCell(2); c.setCellValue(nz(it.getQuantity())); c.setCellStyle(sInt);
+                    Cell c = rr.createCell(2);
+                    c.setCellValue(nz(it.getQuantity()));
+                    c.setCellStyle(sInt);
                     // Đơn giá
-                    Cell d = rr.createCell(3); d.setCellValue(nz(it.getUnitPrice())); d.setCellStyle(sMoney);
+                    Cell d = rr.createCell(3);
+                    d.setCellValue(nz(it.getUnitPrice()));
+                    d.setCellStyle(sMoney);
                     // Thành tiền
                     long lineTotal = nz(it.getTotalPrice());
                     subtotal += lineTotal;
-                    Cell e = rr.createCell(4); e.setCellValue(lineTotal); e.setCellStyle(sMoney);
+                    Cell e = rr.createCell(4);
+                    e.setCellValue(lineTotal);
+                    e.setCellStyle(sMoney);
                 }
             }
 
@@ -311,9 +334,12 @@ public class OrdersServiceImpl implements OrdersService {
                     phone = safe((String) order.getCustomer().getClass().getMethod("getPhone").invoke(order.getCustomer()));
                 } catch (Exception ignore) {}
             }
-            Row rName = getOrCreate(sheet, r2++); rName.createCell(rightCol).setCellValue(fullName);
-            Row rPhone = getOrCreate(sheet, r2++); rPhone.createCell(rightCol).setCellValue(phone);
-            Row rPayM = getOrCreate(sheet, r2++); rPayM.createCell(rightCol).setCellValue(safe(order.getPaymentMethod()));
+            Row rName = getOrCreate(sheet, r2++);
+            rName.createCell(rightCol).setCellValue(fullName);
+            Row rPhone = getOrCreate(sheet, r2++);
+            rPhone.createCell(rightCol).setCellValue(phone);
+            Row rPayM = getOrCreate(sheet, r2++);
+            rPayM.createCell(rightCol).setCellValue(safe(order.getPaymentMethod()));
 
             r2++;
             Row sttTitle = getOrCreate(sheet, r2++);
@@ -342,8 +368,12 @@ public class OrdersServiceImpl implements OrdersService {
 
             long grand = order.getTotalAmount() != null ? order.getTotalAmount().longValue() : subtotal;
             Row grandRow = sheet.createRow(r++);
-            Cell gt = grandRow.createCell(0); gt.setCellValue("Tổng cộng:"); gt.setCellStyle(headerRight(wb));
-            Cell gv = grandRow.createCell(4); gv.setCellValue(grand);       gv.setCellStyle(sMoneyBold);
+            Cell gt = grandRow.createCell(0);
+            gt.setCellValue("Tổng cộng:");
+            gt.setCellStyle(headerRight(wb));
+            Cell gv = grandRow.createCell(4);
+            gv.setCellValue(grand);
+            gv.setCellStyle(sMoneyBold);
 
             // ===== Auto-fit =====
             for (int i = 0; i <= 5; i++) sheet.autoSizeColumn(i);
@@ -366,12 +396,10 @@ public class OrdersServiceImpl implements OrdersService {
     @Transactional(readOnly = true)
     public void exportOrdersToExcel(HttpServletResponse response) {
         LOG.debug("Request to export all orders to Excel");
-        
+
         // Lấy tất cả đơn hàng
         List<Orders> orders = ordersRepository.findAllWithToOneRelationships();
-        List<OrdersDTO> ordersDTO = orders.stream()
-            .map(ordersMapper::toDto)
-            .collect(Collectors.toList());
+        List<OrdersDTO> ordersDTO = orders.stream().map(ordersMapper::toDto).collect(Collectors.toList());
 
         try (Workbook wb = new XSSFWorkbook()) {
             // ====== Styles ======
@@ -423,9 +451,9 @@ public class OrdersServiceImpl implements OrdersService {
                 "Thanh Toán",
                 "Phương Thức Thanh Toán",
                 "Tổng Tiền",
-                "Ghi Chú"
+                "Ghi Chú",
             };
-            
+
             for (int i = 0; i < headers.length; i++) {
                 Cell cell = headerRow.createCell(i);
                 cell.setCellValue(headers[i]);
@@ -435,12 +463,12 @@ public class OrdersServiceImpl implements OrdersService {
             // ===== Dữ liệu đơn hàng =====
             for (OrdersDTO order : ordersDTO) {
                 Row row = sheet.createRow(r++);
-                
+
                 // Mã đơn hàng
                 Cell cell0 = row.createCell(0);
                 cell0.setCellValue(safe(order.getCode()));
                 cell0.setCellStyle(sText);
-                
+
                 // Ngày đặt
                 Cell cell1 = row.createCell(1);
                 if (order.getPlacedAt() != null) {
@@ -450,14 +478,18 @@ public class OrdersServiceImpl implements OrdersService {
                     cell1.setCellValue("");
                     cell1.setCellStyle(sText);
                 }
-                
+
                 // Khách hàng
                 Cell cell2 = row.createCell(2);
                 String customerName = "Khách vãng lai";
                 if (order.getCustomer() != null) {
                     try {
-                        String firstName = safe((String) order.getCustomer().getClass().getMethod("getFirstName").invoke(order.getCustomer()));
-                        String lastName = safe((String) order.getCustomer().getClass().getMethod("getLastName").invoke(order.getCustomer()));
+                        String firstName = safe(
+                            (String) order.getCustomer().getClass().getMethod("getFirstName").invoke(order.getCustomer())
+                        );
+                        String lastName = safe(
+                            (String) order.getCustomer().getClass().getMethod("getLastName").invoke(order.getCustomer())
+                        );
                         customerName = (firstName + " " + lastName).trim();
                         if (customerName.isEmpty()) {
                             customerName = "Khách vãng lai";
@@ -468,22 +500,22 @@ public class OrdersServiceImpl implements OrdersService {
                 }
                 cell2.setCellValue(customerName);
                 cell2.setCellStyle(sText);
-                
+
                 // Trạng thái
                 Cell cell3 = row.createCell(3);
                 cell3.setCellValue(safe(order.getStatus() != null ? order.getStatus().toString() : ""));
                 cell3.setCellStyle(sText);
-                
+
                 // Thanh toán
                 Cell cell4 = row.createCell(4);
                 cell4.setCellValue(safe(order.getPaymentStatus() != null ? order.getPaymentStatus().toString() : ""));
                 cell4.setCellStyle(sText);
-                
+
                 // Phương thức thanh toán
                 Cell cell5 = row.createCell(5);
                 cell5.setCellValue(safe(order.getPaymentMethod()));
                 cell5.setCellStyle(sText);
-                
+
                 // Tổng tiền
                 Cell cell6 = row.createCell(6);
                 if (order.getTotalAmount() != null) {
@@ -493,7 +525,7 @@ public class OrdersServiceImpl implements OrdersService {
                     cell6.setCellValue(0);
                     cell6.setCellStyle(sMoney);
                 }
-                
+
                 // Ghi chú
                 Cell cell7 = row.createCell(7);
                 cell7.setCellValue(safe(order.getNote()));
@@ -508,9 +540,12 @@ public class OrdersServiceImpl implements OrdersService {
             }
 
             // ===== Stream về client =====
-            String filename = URLEncoder.encode("danh_sach_don_hang_" + 
-                DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss").format(Instant.now().atZone(ZoneId.systemDefault())) + 
-                ".xlsx", StandardCharsets.UTF_8);
+            String filename = URLEncoder.encode(
+                "danh_sach_don_hang_" +
+                DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss").format(Instant.now().atZone(ZoneId.systemDefault())) +
+                ".xlsx",
+                StandardCharsets.UTF_8
+            );
             response.setHeader("Content-Disposition", "attachment; filename*=UTF-8''" + filename);
             response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
             try (ServletOutputStream os = response.getOutputStream()) {
@@ -525,16 +560,34 @@ public class OrdersServiceImpl implements OrdersService {
 
     @Override
     @Transactional
-    public OrdersDTO createOrderFromCart(String paymentMethod, String note, Integer redeemedPoints, String voucherCode, BigDecimal shippingCost, String shippingInfo) {
+    public OrdersDTO createOrderFromCart(
+        String paymentMethod,
+        String note,
+        Integer redeemedPoints,
+        String voucherCode,
+        BigDecimal shippingCost,
+        String shippingInfo
+    ) {
         // Lấy userId từ SecurityContext
-        Long userId = SecurityUtils.getCurrentUserId()
-            .orElseThrow(() -> new IllegalArgumentException("User not authenticated"));
+        Long userId = SecurityUtils.getCurrentUserId().orElseThrow(() -> new IllegalArgumentException("User not authenticated"));
 
         LOG.debug("Request to create order from cart for user: {} with voucher: {}", userId, voucherCode);
 
-        // Lấy customer từ userId
-        Customer customer = customerRepository.findByUserId(userId)
-            .orElseThrow(() -> new IllegalArgumentException("Customer not found for user: " + userId));
+        // Lấy customer từ userId, tự động tạo nếu chưa có
+        Customer customer = customerRepository
+            .findByUserId(userId)
+            .orElseGet(() -> {
+                Customer newCust = new Customer();
+                User userRef = new User();
+                userRef.setId(userId);
+                newCust.setUser(userRef);
+                newCust.setFirstName("Customer");
+                newCust.setLastName("");
+                newCust.setPhone("");
+                newCust.setTier(CustomerTier.BRONZE);
+                newCust.setLoyaltyPoints(0);
+                return customerRepository.save(newCust);
+            });
 
         // Lấy tất cả items trong giỏ hàng
         List<CartItem> cartItems = cartItemRepository.findAllByCustomerId(userId);
@@ -548,15 +601,29 @@ public class OrdersServiceImpl implements OrdersService {
         // Tính tổng tiền sản phẩm (có tính giá flash sale nếu có) và discount từ flash sale
         BigDecimal subtotal = BigDecimal.ZERO;
         BigDecimal flashSaleDiscount = BigDecimal.ZERO;
+        List<CartItem> validCartItems = new ArrayList<>();
+        List<CartItem> orphanedCartItems = new ArrayList<>();
+
         for (CartItem cartItem : cartItems) {
             // Lấy giá gốc từ ProductVariant
-            ProductVariant variant = productVariantRepository.findById(cartItem.getVariantId())
-                .orElseThrow(() -> new IllegalArgumentException("Product variant not found: " + cartItem.getVariantId()));
+            Optional<ProductVariant> variantOpt = productVariantRepository.findById(cartItem.getVariantId());
+            if (variantOpt.isEmpty()) {
+                LOG.warn(
+                    "Product variant not found for cart item: {}, variantId: {}. Ignoring this item.",
+                    cartItem.getId(),
+                    cartItem.getVariantId()
+                );
+                orphanedCartItems.add(cartItem);
+                continue;
+            }
+            ProductVariant variant = variantOpt.get();
+            validCartItems.add(cartItem);
+
             BigDecimal originalPrice = variant.getPrice() != null ? variant.getPrice() : BigDecimal.ZERO;
-            
+
             // Kiểm tra xem product variant có trong flash sale đang active không
             BigDecimal unitPrice = originalPrice;
-            Optional<com.lumiere.app.service.dto.FlashSaleProductDTO> flashSaleProductOpt = 
+            Optional<com.lumiere.app.service.dto.FlashSaleProductDTO> flashSaleProductOpt =
                 flashSaleProductService.findActiveByProductVariantId(cartItem.getVariantId());
             if (flashSaleProductOpt.isPresent()) {
                 com.lumiere.app.service.dto.FlashSaleProductDTO flashSaleProduct = flashSaleProductOpt.get();
@@ -564,18 +631,32 @@ public class OrdersServiceImpl implements OrdersService {
                 if (flashSaleProduct.getSalePrice() != null) {
                     unitPrice = flashSaleProduct.getSalePrice();
                     // Tính discount từ flash sale cho item này
-                    BigDecimal itemFlashSaleDiscount = originalPrice.subtract(unitPrice)
+                    BigDecimal itemFlashSaleDiscount = originalPrice
+                        .subtract(unitPrice)
                         .multiply(BigDecimal.valueOf(cartItem.getQuantity()));
                     flashSaleDiscount = flashSaleDiscount.add(itemFlashSaleDiscount);
                 }
                 flashSaleProduct.setSold(flashSaleProduct.getSold() + cartItem.getQuantity());
                 flashSaleProductService.save(flashSaleProduct);
             }
-            
+
             // Tính tổng tiền cho item này
             BigDecimal itemTotal = unitPrice.multiply(BigDecimal.valueOf(cartItem.getQuantity()));
             subtotal = subtotal.add(itemTotal);
         }
+
+        // Xóa các cart item mồ côi
+        if (!orphanedCartItems.isEmpty()) {
+            cartItemRepository.deleteAll(orphanedCartItems);
+            LOG.info("Deleted {} orphaned cart items for user {}", orphanedCartItems.size(), userId);
+        }
+
+        if (validCartItems.isEmpty()) {
+            throw new IllegalArgumentException("Cart is empty or contains only invalid items");
+        }
+
+        // Sử dụng danh sách hợp lệ
+        cartItems = validCartItems;
 
         // Tính phí vận chuyển theo tier
         CustomerTier tier = customer.getTier() != null ? customer.getTier() : CustomerTier.BRONZE;
@@ -629,7 +710,7 @@ public class OrdersServiceImpl implements OrdersService {
 
                 // Tính số tiền giảm giá từ voucher
                 voucherDiscount = voucherService.calculateDiscountAmount(voucher, totalAmount);
-                
+
                 // Cộng discount từ voucher vào discountAmount
                 discountAmount = discountAmount.add(voucherDiscount);
 
@@ -644,7 +725,7 @@ public class OrdersServiceImpl implements OrdersService {
                 throw new IllegalArgumentException("Lỗi voucher: " + e.getMessage());
             }
         }
-        
+
         if (flashSaleDiscount.compareTo(BigDecimal.ZERO) > 0) {
             LOG.debug("Flash sale discount: {}", flashSaleDiscount);
         }
@@ -654,7 +735,9 @@ public class OrdersServiceImpl implements OrdersService {
             // Kiểm tra khách hàng có đủ điểm không
             Integer currentPoints = customer.getLoyaltyPoints() != null ? customer.getLoyaltyPoints() : 0;
             if (currentPoints < redeemedPoints) {
-                throw new IllegalArgumentException("Khách hàng không đủ điểm tích lũy. Hiện có: " + currentPoints + ", yêu cầu: " + redeemedPoints);
+                throw new IllegalArgumentException(
+                    "Khách hàng không đủ điểm tích lũy. Hiện có: " + currentPoints + ", yêu cầu: " + redeemedPoints
+                );
             }
 
             // Giả sử 1 điểm = 1000 VND
@@ -676,7 +759,6 @@ public class OrdersServiceImpl implements OrdersService {
             transaction.setDescription("Sử dụng điểm tích lũy cho đơn hàng #" + orderCode);
             transaction.setCreatedAt(Instant.now());
             loyaltyTransactionRepository.save(transaction);
-
         }
 
         // Tạo đơn hàng
@@ -706,12 +788,13 @@ public class OrdersServiceImpl implements OrdersService {
 
         // Tạo OrderItems từ CartItems
         for (CartItem cartItem : cartItems) {
-            ProductVariant variant = productVariantRepository.findById(cartItem.getVariantId())
+            ProductVariant variant = productVariantRepository
+                .findById(cartItem.getVariantId())
                 .orElseThrow(() -> new IllegalArgumentException("Product variant not found: " + cartItem.getVariantId()));
 
             // Kiểm tra xem product variant có trong flash sale đang active không
             BigDecimal unitPrice = cartItem.getUnitPrice();
-            Optional<com.lumiere.app.service.dto.FlashSaleProductDTO> flashSaleProductOpt = 
+            Optional<com.lumiere.app.service.dto.FlashSaleProductDTO> flashSaleProductOpt =
                 flashSaleProductService.findActiveByProductVariantId(cartItem.getVariantId());
             if (flashSaleProductOpt.isPresent()) {
                 com.lumiere.app.service.dto.FlashSaleProductDTO flashSaleProduct = flashSaleProductOpt.get();
@@ -720,7 +803,7 @@ public class OrdersServiceImpl implements OrdersService {
                     unitPrice = flashSaleProduct.getSalePrice();
                 }
             }
-            
+
             // Tính tổng tiền cho item này
             BigDecimal itemTotalPrice = unitPrice.multiply(BigDecimal.valueOf(cartItem.getQuantity()));
 
@@ -742,23 +825,22 @@ public class OrdersServiceImpl implements OrdersService {
             if (variant != null && variant.getPrice() != null) {
                 BigDecimal originalPrice = variant.getPrice();
                 BigDecimal salePrice = orderItem.getUnitPrice();
-                
+
                 // Nếu giá bán nhỏ hơn giá gốc, có discount từ flash sale
                 if (salePrice.compareTo(originalPrice) < 0) {
-                    BigDecimal itemDiscount = originalPrice.subtract(salePrice)
-                        .multiply(BigDecimal.valueOf(orderItem.getQuantity()));
+                    BigDecimal itemDiscount = originalPrice.subtract(salePrice).multiply(BigDecimal.valueOf(orderItem.getQuantity()));
                     recalculatedFlashSaleDiscount = recalculatedFlashSaleDiscount.add(itemDiscount);
                 }
             }
         }
-        
+
         // Tính lại discountAmount: flash sale discount (tính lại) + voucher discount
         BigDecimal finalDiscountAmount = recalculatedFlashSaleDiscount.add(voucherDiscount);
-        
+
         // Cập nhật discountAmount vào order
         order.setDiscountAmount(finalDiscountAmount);
         order = ordersRepository.save(order);
-        
+
         if (recalculatedFlashSaleDiscount.compareTo(BigDecimal.ZERO) > 0) {
             LOG.debug("Recalculated flash sale discount based on OrderItems: {}", recalculatedFlashSaleDiscount);
         }
@@ -771,25 +853,24 @@ public class OrdersServiceImpl implements OrdersService {
         createOrderStatusHistory(order, OrderStatus.PENDING, "Đơn hàng được tạo từ giỏ hàng");
 
         // Gửi notification cho admin về đơn hàng mới
-        String customerName = (customer.getFirstName() != null ? customer.getFirstName() : "") + 
-                             (customer.getLastName() != null ? " " + customer.getLastName() : "");
+        String customerName =
+            (customer.getFirstName() != null ? customer.getFirstName() : "") +
+            (customer.getLastName() != null ? " " + customer.getLastName() : "");
         customerName = customerName.trim().isEmpty() ? "Khách hàng #" + customer.getId() : customerName;
-        String adminMessage = String.format("Có đơn hàng mới #%s từ %s với tổng tiền %s VND", 
-            orderCode, customerName, totalAmount);
-        notificationProducerService.sendAdminNotification(
-            NotificationType.NEW_ORDER,
-            adminMessage,
-            "/admin/orders/" + order.getId()
-        );
+        String adminMessage = String.format("Có đơn hàng mới #%s từ %s với tổng tiền %s VND", orderCode, customerName, totalAmount);
+        notificationProducerService.sendAdminNotification(NotificationType.NEW_ORDER, adminMessage, "/admin/orders/" + order.getId());
 
         // Gửi message vào Kafka để xử lý stock quantity bất đồng bộ
-        List<OrderStockProcessingMessage.StockDeductionItem> stockItems = cartItems.stream()
-            .map(cartItem -> new OrderStockProcessingMessage.StockDeductionItem(
-                cartItem.getVariantId(),
-                cartItem.getQuantity() != null ? cartItem.getQuantity().longValue() : 0L
-            ))
+        List<OrderStockProcessingMessage.StockDeductionItem> stockItems = cartItems
+            .stream()
+            .map(cartItem ->
+                new OrderStockProcessingMessage.StockDeductionItem(
+                    cartItem.getVariantId(),
+                    cartItem.getQuantity() != null ? cartItem.getQuantity().longValue() : 0L
+                )
+            )
             .collect(Collectors.toList());
-        
+
         OrderStockProcessingMessage stockMessage = new OrderStockProcessingMessage(order.getId(), stockItems);
         orderStockProducerService.sendStockProcessingMessage(stockMessage);
         LOG.info("Sent stock processing message to Kafka for order: {}", order.getId());
@@ -804,18 +885,23 @@ public class OrdersServiceImpl implements OrdersService {
     public OrdersDTO updateOrderStatus(Long orderId, OrderStatus newStatus, String description) {
         LOG.debug("Request to update order status: {} to {}", orderId, newStatus);
 
-        Orders order = ordersRepository.findById(orderId)
-            .orElseThrow(() -> new IllegalArgumentException("Order not found: " + orderId));
+        Orders order = ordersRepository.findById(orderId).orElseThrow(() -> new IllegalArgumentException("Order not found: " + orderId));
 
         OrderStatus oldStatus = order.getStatus();
         order.setStatus(newStatus);
 
         // Tạo lịch sử trạng thái
-        createOrderStatusHistory(order, newStatus, description != null ? description : "Trạng thái thay đổi từ " + oldStatus + " sang " + newStatus);
+        createOrderStatusHistory(
+            order,
+            newStatus,
+            description != null ? description : "Trạng thái thay đổi từ " + oldStatus + " sang " + newStatus
+        );
 
         // Xử lý loyalty points khi đơn hàng hoàn thành
-        if ((newStatus == OrderStatus.DELIVERED || newStatus == OrderStatus.COMPLETED) &&
-            (oldStatus != OrderStatus.DELIVERED && oldStatus != OrderStatus.COMPLETED)) {
+        if (
+            (newStatus == OrderStatus.DELIVERED || newStatus == OrderStatus.COMPLETED) &&
+            (oldStatus != OrderStatus.DELIVERED && oldStatus != OrderStatus.COMPLETED)
+        ) {
             processLoyaltyPointsForOrder(order);
         }
 
@@ -824,8 +910,7 @@ public class OrdersServiceImpl implements OrdersService {
         // Gửi notification cho customer về cập nhật trạng thái đơn hàng
         if (order.getCustomer() != null) {
             String statusMessage = getOrderStatusMessage(newStatus);
-            String customerMessage = String.format("Đơn hàng #%s của bạn đã được cập nhật: %s", 
-                order.getCode(), statusMessage);
+            String customerMessage = String.format("Đơn hàng #%s của bạn đã được cập nhật: %s", order.getCode(), statusMessage);
             notificationProducerService.sendCustomerNotification(
                 order.getCustomer().getId(),
                 NotificationType.ORDER_UPDATE,
@@ -868,8 +953,7 @@ public class OrdersServiceImpl implements OrdersService {
     public OrdersDTO cancelOrder(Long orderId, String reason) {
         LOG.debug("Request to cancel order: {}", orderId);
 
-        Orders order = ordersRepository.findById(orderId)
-            .orElseThrow(() -> new IllegalArgumentException("Order not found: " + orderId));
+        Orders order = ordersRepository.findById(orderId).orElseThrow(() -> new IllegalArgumentException("Order not found: " + orderId));
 
         if (order.getStatus() == OrderStatus.CANCELLED) {
             throw new IllegalArgumentException("Order is already cancelled");
@@ -889,20 +973,20 @@ public class OrdersServiceImpl implements OrdersService {
         LOG.info("Triggered stock restoration for cancelled order: {}", order.getId());
 
         // Gửi notification cho admin về đơn hàng bị hủy
-        String customerName = order.getCustomer() != null ? 
-            ((order.getCustomer().getFirstName() != null ? order.getCustomer().getFirstName() : "") + 
-             (order.getCustomer().getLastName() != null ? " " + order.getCustomer().getLastName() : "")).trim() : 
-            "Khách hàng";
+        String customerName = order.getCustomer() != null
+            ? ((order.getCustomer().getFirstName() != null ? order.getCustomer().getFirstName() : "") +
+                (order.getCustomer().getLastName() != null ? " " + order.getCustomer().getLastName() : "")).trim()
+            : "Khách hàng";
         if (customerName.isEmpty()) {
             customerName = "Khách hàng #" + (order.getCustomer() != null ? order.getCustomer().getId() : "");
         }
-        String adminMessage = String.format("Đơn hàng #%s từ %s đã bị hủy. Lý do: %s", 
-            order.getCode(), customerName, reason != null ? reason : "Không có lý do");
-        notificationProducerService.sendAdminNotification(
-            NotificationType.ORDER_CANCELLED,
-            adminMessage,
-            "/admin/orders/" + order.getId()
+        String adminMessage = String.format(
+            "Đơn hàng #%s từ %s đã bị hủy. Lý do: %s",
+            order.getCode(),
+            customerName,
+            reason != null ? reason : "Không có lý do"
         );
+        notificationProducerService.sendAdminNotification(NotificationType.ORDER_CANCELLED, adminMessage, "/admin/orders/" + order.getId());
 
         OrdersDTO dto = ordersMapper.toDto(order);
         setCanReview(dto, order);
@@ -914,8 +998,7 @@ public class OrdersServiceImpl implements OrdersService {
     public OrdersDTO confirmOrder(Long orderId) {
         LOG.debug("Request to confirm order: {}", orderId);
 
-        Orders order = ordersRepository.findById(orderId)
-            .orElseThrow(() -> new IllegalArgumentException("Order not found: " + orderId));
+        Orders order = ordersRepository.findById(orderId).orElseThrow(() -> new IllegalArgumentException("Order not found: " + orderId));
 
         if (order.getStatus() != OrderStatus.PENDING) {
             throw new IllegalArgumentException("Only pending orders can be confirmed");
@@ -935,8 +1018,7 @@ public class OrdersServiceImpl implements OrdersService {
     public OrdersDTO confirmPayment(Long orderId) {
         LOG.debug("Request to confirm payment for order: {}", orderId);
 
-        Orders order = ordersRepository.findById(orderId)
-            .orElseThrow(() -> new IllegalArgumentException("Order not found: " + orderId));
+        Orders order = ordersRepository.findById(orderId).orElseThrow(() -> new IllegalArgumentException("Order not found: " + orderId));
 
         if (order.getPaymentStatus() == PaymentStatus.PAID) {
             throw new IllegalArgumentException("Đơn hàng đã được thanh toán rồi");
@@ -961,35 +1043,36 @@ public class OrdersServiceImpl implements OrdersService {
     @Transactional(readOnly = true)
     public Page<OrdersDTO> getOrdersByCustomerId(Long customerId, Pageable pageable) {
         LOG.debug("Request to get orders by customer: {}", customerId);
-        return ordersRepository.findByCustomerId(customerId, pageable).map(order -> {
-            OrdersDTO dto = ordersMapper.toDto(order);
-            setCanReview(dto, order);
-            return dto;
-        });
+        return ordersRepository
+            .findByCustomerId(customerId, pageable)
+            .map(order -> {
+                OrdersDTO dto = ordersMapper.toDto(order);
+                setCanReview(dto, order);
+                return dto;
+            });
     }
 
     @Override
     @Transactional(readOnly = true)
     public Optional<OrdersDTO> findByCode(String code) {
         LOG.debug("Request to get order by code: {}", code);
-        return ordersRepository.findByCode(code).map(order -> {
-            OrdersDTO dto = ordersMapper.toDto(order);
-            // Lấy orderItems từ service và map vào DTO
-            List<OrderItemDTO> orderItems = orderItemService.findAllByOrderId(order.getId());
-            dto.setOrderItems(orderItems);
-            setCanReview(dto, order);
-            return dto;
-        });
+        return ordersRepository
+            .findByCode(code)
+            .map(order -> {
+                OrdersDTO dto = ordersMapper.toDto(order);
+                // Lấy orderItems từ service và map vào DTO
+                List<OrderItemDTO> orderItems = orderItemService.findAllByOrderId(order.getId());
+                dto.setOrderItems(orderItems);
+                setCanReview(dto, order);
+                return dto;
+            });
     }
 
     /**
      * Set canReview field dựa trên status của đơn hàng.
      */
     private void setCanReview(OrdersDTO dto, Orders order) {
-        dto.setCanReview(
-            order.getStatus() == OrderStatus.COMPLETED ||
-            order.getStatus() == OrderStatus.DELIVERED
-        );
+        dto.setCanReview(order.getStatus() == OrderStatus.COMPLETED || order.getStatus() == OrderStatus.DELIVERED);
     }
 
     @Override
@@ -997,9 +1080,7 @@ public class OrdersServiceImpl implements OrdersService {
     public List<OrderStatusHistoryDTO> getOrderStatusHistory(Long orderId) {
         LOG.debug("Request to get order status history: {}", orderId);
         List<OrderStatusHistory> histories = orderStatusHistoryRepository.findByOrderIdOrderByTimestampDesc(orderId);
-        return histories.stream()
-            .map(orderStatusHistoryMapper::toDto)
-            .collect(Collectors.toList());
+        return histories.stream().map(orderStatusHistoryMapper::toDto).collect(Collectors.toList());
     }
 
     /**
@@ -1025,51 +1106,67 @@ public class OrdersServiceImpl implements OrdersService {
 
     /* ================= helpers ================= */
 
-    private static long nz(Integer v) { return v == null ? 0L : v.longValue(); }
-    private static long nz(java.math.BigDecimal v) { return v == null ? 0L : v.longValue(); }
-    private static String safe(String s){ return s == null ? "" : s; }
+    private static long nz(Integer v) {
+        return v == null ? 0L : v.longValue();
+    }
+
+    private static long nz(java.math.BigDecimal v) {
+        return v == null ? 0L : v.longValue();
+    }
+
+    private static String safe(String s) {
+        return s == null ? "" : s;
+    }
 
     private static void setAllBorders(CellStyle style, BorderStyle b) {
-        style.setBorderTop(b); style.setBorderBottom(b); style.setBorderLeft(b); style.setBorderRight(b);
+        style.setBorderTop(b);
+        style.setBorderBottom(b);
+        style.setBorderLeft(b);
+        style.setBorderRight(b);
     }
-    private static CellStyle fHdrTitle(Workbook wb){
-        Font f = wb.createFont(); f.setBold(true);
-        CellStyle cs = wb.createCellStyle(); cs.setFont(f);
+
+    private static CellStyle fHdrTitle(Workbook wb) {
+        Font f = wb.createFont();
+        f.setBold(true);
+        CellStyle cs = wb.createCellStyle();
+        cs.setFont(f);
         cs.setFillForegroundColor(IndexedColors.GREY_25_PERCENT.getIndex());
         cs.setFillPattern(FillPatternType.SOLID_FOREGROUND);
         return cs;
     }
-    private static CellStyle headerRight(Workbook wb){
-        Font f = wb.createFont(); f.setBold(true);
-        CellStyle cs = wb.createCellStyle(); cs.setFont(f);
+
+    private static CellStyle headerRight(Workbook wb) {
+        Font f = wb.createFont();
+        f.setBold(true);
+        CellStyle cs = wb.createCellStyle();
+        cs.setFont(f);
         cs.setAlignment(HorizontalAlignment.RIGHT);
         return cs;
     }
-    private static Row getOrCreate(Sheet sheet, int rowIdx){
+
+    private static Row getOrCreate(Sheet sheet, int rowIdx) {
         Row r = sheet.getRow(rowIdx);
         return r != null ? r : sheet.createRow(rowIdx);
     }
-    private static int writeAmountRow(Sheet sh, int r, String label, long value, CellStyle sText, CellStyle sMoney){
+
+    private static int writeAmountRow(Sheet sh, int r, String label, long value, CellStyle sText, CellStyle sMoney) {
         Row row = sh.createRow(r++);
-        Cell l = row.createCell(0); l.setCellValue(label); l.setCellStyle(sText);
-        Cell v = row.createCell(4); v.setCellValue(value); v.setCellStyle(sMoney);
+        Cell l = row.createCell(0);
+        l.setCellValue(label);
+        l.setCellStyle(sText);
+        Cell v = row.createCell(4);
+        v.setCellValue(value);
+        v.setCellStyle(sMoney);
         return r;
     }
 
     @Override
     @Transactional
-    public ProductReviewDTO createReviewForOrderItem(
-        Long orderId,
-        Long orderItemId,
-        RatingType rating,
-        String comment,
-        String author
-    ) {
+    public ProductReviewDTO createReviewForOrderItem(Long orderId, Long orderItemId, RatingType rating, String comment, String author) {
         LOG.debug("Request to create review for order item: {} in order: {}", orderItemId, orderId);
 
         // Kiểm tra đơn hàng tồn tại
-        Orders order = ordersRepository.findById(orderId)
-            .orElseThrow(() -> new IllegalArgumentException("Order not found: " + orderId));
+        Orders order = ordersRepository.findById(orderId).orElseThrow(() -> new IllegalArgumentException("Order not found: " + orderId));
 
         // Kiểm tra đơn hàng đã được giao chưa
         if (order.getStatus() != OrderStatus.DELIVERED && order.getStatus() != OrderStatus.COMPLETED) {
@@ -1077,7 +1174,8 @@ public class OrdersServiceImpl implements OrdersService {
         }
 
         // Kiểm tra order item tồn tại và thuộc về đơn hàng
-        OrderItem orderItem = orderItemRepository.findById(orderItemId)
+        OrderItem orderItem = orderItemRepository
+            .findById(orderItemId)
             .orElseThrow(() -> new IllegalArgumentException("Order item not found: " + orderItemId));
 
         if (!orderItem.getOrder().getId().equals(orderId)) {
@@ -1127,8 +1225,7 @@ public class OrdersServiceImpl implements OrdersService {
     public List<OrderItemDTO> getReviewableProductsFromOrder(Long orderId) {
         LOG.debug("Request to get reviewable products from order: {}", orderId);
 
-        Orders order = ordersRepository.findById(orderId)
-            .orElseThrow(() -> new IllegalArgumentException("Order not found: " + orderId));
+        Orders order = ordersRepository.findById(orderId).orElseThrow(() -> new IllegalArgumentException("Order not found: " + orderId));
 
         // Chỉ trả về các sản phẩm trong đơn hàng đã được giao
         if (order.getStatus() != OrderStatus.DELIVERED && order.getStatus() != OrderStatus.COMPLETED) {
@@ -1139,7 +1236,8 @@ public class OrdersServiceImpl implements OrdersService {
         List<OrderItem> orderItems = orderItemRepository.findAllByOrderId(orderId);
 
         // Lọc các sản phẩm chưa được review
-        return orderItems.stream()
+        return orderItems
+            .stream()
             .filter(item -> {
                 if (item.getProductVariant() == null || item.getProductVariant().getProduct() == null) {
                     return false;
@@ -1164,7 +1262,8 @@ public class OrdersServiceImpl implements OrdersService {
     public boolean hasCustomerReviewedProduct(Long customerId, Long productId) {
         LOG.debug("Request to check if customer {} has reviewed product {}", customerId, productId);
 
-        Customer customer = customerRepository.findById(customerId)
+        Customer customer = customerRepository
+            .findById(customerId)
             .orElseThrow(() -> new IllegalArgumentException("Customer not found: " + customerId));
 
         // Kiểm tra product tồn tại
@@ -1176,11 +1275,12 @@ public class OrdersServiceImpl implements OrdersService {
         String customerName = getCustomerName(customer);
 
         // Kiểm tra xem có review nào của khách hàng này cho sản phẩm này không
-        return productReviewRepository.findAll().stream()
-            .anyMatch(review ->
-                review.getProduct() != null &&
-                review.getProduct().getId().equals(productId) &&
-                review.getAuthor().equals(customerName)
+        return productReviewRepository
+            .findAll()
+            .stream()
+            .anyMatch(
+                review ->
+                    review.getProduct() != null && review.getProduct().getId().equals(productId) && review.getAuthor().equals(customerName)
             );
     }
 
@@ -1189,14 +1289,14 @@ public class OrdersServiceImpl implements OrdersService {
     public List<ProductReviewDTO> getReviewsForOrder(Long orderId) {
         LOG.debug("Request to get reviews for order: {}", orderId);
 
-        Orders order = ordersRepository.findById(orderId)
-            .orElseThrow(() -> new IllegalArgumentException("Order not found: " + orderId));
+        Orders order = ordersRepository.findById(orderId).orElseThrow(() -> new IllegalArgumentException("Order not found: " + orderId));
 
         // Lấy tất cả order items
         List<OrderItem> orderItems = orderItemRepository.findAllByOrderId(orderId);
 
         // Lấy tất cả product IDs từ order items
-        List<Long> productIds = orderItems.stream()
+        List<Long> productIds = orderItems
+            .stream()
             .filter(item -> item.getProductVariant() != null && item.getProductVariant().getProduct() != null)
             .map(item -> item.getProductVariant().getProduct().getId())
             .distinct()
@@ -1209,11 +1309,14 @@ public class OrdersServiceImpl implements OrdersService {
         // Lấy tất cả reviews của các sản phẩm trong đơn hàng
         String customerName = getCustomerName(order.getCustomer());
 
-        return productReviewRepository.findAll().stream()
-            .filter(review ->
-                review.getProduct() != null &&
-                productIds.contains(review.getProduct().getId()) &&
-                review.getAuthor().equals(customerName)
+        return productReviewRepository
+            .findAll()
+            .stream()
+            .filter(
+                review ->
+                    review.getProduct() != null &&
+                    productIds.contains(review.getProduct().getId()) &&
+                    review.getAuthor().equals(customerName)
             )
             .map(review -> {
                 ProductReviewDTO dto = new ProductReviewDTO();
@@ -1265,20 +1368,17 @@ public class OrdersServiceImpl implements OrdersService {
      */
     private void updateProductRating(Product product) {
         ProductDTO productDTO = productMapper.toDto(product);
-        List<ProductReview> approvedReviews = productReviewRepository.findAll().stream()
-            .filter(review ->
-                review.getProduct() != null &&
-                review.getProduct().getId().equals(product.getId())
-            )
+        List<ProductReview> approvedReviews = productReviewRepository
+            .findAll()
+            .stream()
+            .filter(review -> review.getProduct() != null && review.getProduct().getId().equals(product.getId()))
             .collect(Collectors.toList());
 
         if (approvedReviews.isEmpty()) {
             productDTO.setAverageRating(0.0);
             productDTO.setReviewCount(0);
         } else {
-            double totalRating = approvedReviews.stream()
-                .mapToDouble(review -> RatingUtils.toNumber(review.getRating()))
-                .sum();
+            double totalRating = approvedReviews.stream().mapToDouble(review -> RatingUtils.toNumber(review.getRating())).sum();
 
             productDTO.setAverageRating(totalRating / approvedReviews.size());
             productDTO.setReviewCount(approvedReviews.size());
@@ -1336,7 +1436,9 @@ public class OrdersServiceImpl implements OrdersService {
         }
 
         // Tính điểm: subtotal * pointsRate / 1000 (vì 1 điểm = 1000 VND)
-        BigDecimal pointsDecimal = subtotal.multiply(BigDecimal.valueOf(pointsRate)).divide(BigDecimal.valueOf(1000), 0, java.math.RoundingMode.DOWN);
+        BigDecimal pointsDecimal = subtotal
+            .multiply(BigDecimal.valueOf(pointsRate))
+            .divide(BigDecimal.valueOf(1000), 0, java.math.RoundingMode.DOWN);
         int pointsEarned = pointsDecimal.intValue();
 
         // Tối thiểu 1 điểm nếu đơn hàng đủ lớn
@@ -1357,14 +1459,25 @@ public class OrdersServiceImpl implements OrdersService {
             transaction.setType(LoyaltyTransactionType.EARNED);
             transaction.setPoints(pointsEarned);
             transaction.setDescription(
-                String.format("Tích điểm từ đơn hàng #%s - %s VND (Tier: %s, Tỷ lệ: %.1f%%)",
-                    order.getCode(), subtotal, tier, pointsRate * 100)
+                String.format(
+                    "Tích điểm từ đơn hàng #%s - %s VND (Tier: %s, Tỷ lệ: %.1f%%)",
+                    order.getCode(),
+                    subtotal,
+                    tier,
+                    pointsRate * 100
+                )
             );
             transaction.setCreatedAt(Instant.now());
             loyaltyTransactionRepository.save(transaction);
 
-            LOG.info("Added {} loyalty points to customer {} (tier: {}) for order {} (subtotal: {})",
-                pointsEarned, customer.getId(), tier, order.getCode(), subtotal);
+            LOG.info(
+                "Added {} loyalty points to customer {} (tier: {}) for order {} (subtotal: {})",
+                pointsEarned,
+                customer.getId(),
+                tier,
+                order.getCode(),
+                subtotal
+            );
         }
     }
 
@@ -1374,8 +1487,7 @@ public class OrdersServiceImpl implements OrdersService {
         LOG.debug("Request to create reviews for order: {}", orderId);
 
         // Kiểm tra đơn hàng tồn tại
-        Orders order = ordersRepository.findById(orderId)
-            .orElseThrow(() -> new IllegalArgumentException("Order not found: " + orderId));
+        Orders order = ordersRepository.findById(orderId).orElseThrow(() -> new IllegalArgumentException("Order not found: " + orderId));
 
         // Kiểm tra đơn hàng đã được giao chưa
         if (order.getStatus() != OrderStatus.DELIVERED && order.getStatus() != OrderStatus.COMPLETED) {
@@ -1392,8 +1504,7 @@ public class OrdersServiceImpl implements OrdersService {
 
         // Lấy tất cả order items của đơn hàng
         List<OrderItem> orderItems = orderItemRepository.findAllByOrderId(orderId);
-        Map<Long, OrderItem> orderItemMap = orderItems.stream()
-            .collect(Collectors.toMap(OrderItem::getId, item -> item));
+        Map<Long, OrderItem> orderItemMap = orderItems.stream().collect(Collectors.toMap(OrderItem::getId, item -> item));
 
         List<ProductReviewDTO> createdReviews = new ArrayList<>();
 
@@ -1489,23 +1600,18 @@ public class OrdersServiceImpl implements OrdersService {
                     return OrderStatus.CONFIRMED;
                 }
                 return null;
-
             case CONFIRMED:
                 // CONFIRMED -> PROCESSING
                 return OrderStatus.PROCESSING;
-
             case PROCESSING:
                 // PROCESSING -> SHIPPING
                 return OrderStatus.SHIPPING;
-
             case SHIPPING:
                 // SHIPPING -> DELIVERED
                 return OrderStatus.DELIVERED;
-
             case DELIVERED:
                 // DELIVERED -> COMPLETED
                 return OrderStatus.COMPLETED;
-
             default:
                 return null;
         }
@@ -1536,13 +1642,14 @@ public class OrdersServiceImpl implements OrdersService {
         BigDecimal flashSaleDiscount = BigDecimal.ZERO;
         for (com.lumiere.app.service.dto.GuestCartItemDTO cartItem : cartItems) {
             // Lấy giá gốc từ ProductVariant
-            ProductVariant variant = productVariantRepository.findById(cartItem.getVariantId())
+            ProductVariant variant = productVariantRepository
+                .findById(cartItem.getVariantId())
                 .orElseThrow(() -> new IllegalArgumentException("Product variant not found: " + cartItem.getVariantId()));
             BigDecimal originalPrice = variant.getPrice() != null ? variant.getPrice() : BigDecimal.ZERO;
-            
+
             // Kiểm tra xem product variant có trong flash sale đang active không
             BigDecimal unitPrice = originalPrice;
-            Optional<com.lumiere.app.service.dto.FlashSaleProductDTO> flashSaleProductOpt = 
+            Optional<com.lumiere.app.service.dto.FlashSaleProductDTO> flashSaleProductOpt =
                 flashSaleProductService.findActiveByProductVariantId(cartItem.getVariantId());
             if (flashSaleProductOpt.isPresent()) {
                 com.lumiere.app.service.dto.FlashSaleProductDTO flashSaleProduct = flashSaleProductOpt.get();
@@ -1550,12 +1657,13 @@ public class OrdersServiceImpl implements OrdersService {
                 if (flashSaleProduct.getSalePrice() != null) {
                     unitPrice = flashSaleProduct.getSalePrice();
                     // Tính discount từ flash sale cho item này
-                    BigDecimal itemFlashSaleDiscount = originalPrice.subtract(unitPrice)
+                    BigDecimal itemFlashSaleDiscount = originalPrice
+                        .subtract(unitPrice)
                         .multiply(BigDecimal.valueOf(cartItem.getQuantity()));
                     flashSaleDiscount = flashSaleDiscount.add(itemFlashSaleDiscount);
                 }
             }
-            
+
             // Tính tổng tiền cho item này
             BigDecimal itemTotal = unitPrice.multiply(BigDecimal.valueOf(cartItem.getQuantity()));
             subtotal = subtotal.add(itemTotal);
@@ -1591,7 +1699,7 @@ public class OrdersServiceImpl implements OrdersService {
 
                 // Tính số tiền giảm giá từ voucher
                 BigDecimal voucherDiscount = voucherService.calculateDiscountAmount(voucher, totalAmount);
-                
+
                 // Cộng discount từ voucher vào discountAmount
                 discountAmount = discountAmount.add(voucherDiscount);
 
@@ -1606,7 +1714,7 @@ public class OrdersServiceImpl implements OrdersService {
                 throw new IllegalArgumentException("Lỗi voucher: " + e.getMessage());
             }
         }
-        
+
         if (flashSaleDiscount.compareTo(BigDecimal.ZERO) > 0) {
             LOG.debug("Flash sale discount: {}", flashSaleDiscount);
         }
@@ -1643,7 +1751,8 @@ public class OrdersServiceImpl implements OrdersService {
 
         // Tạo OrderItems từ GuestCartItemDTO
         for (com.lumiere.app.service.dto.GuestCartItemDTO cartItem : cartItems) {
-            ProductVariant variant = productVariantRepository.findById(cartItem.getVariantId())
+            ProductVariant variant = productVariantRepository
+                .findById(cartItem.getVariantId())
                 .orElseThrow(() -> new IllegalArgumentException("Product variant not found: " + cartItem.getVariantId()));
 
             // Sử dụng unitPrice từ cartItem hoặc lấy từ variant
@@ -1651,9 +1760,9 @@ public class OrdersServiceImpl implements OrdersService {
             if (unitPrice == null) {
                 unitPrice = variant.getPrice() != null ? variant.getPrice() : BigDecimal.ZERO;
             }
-            
+
             // Kiểm tra xem product variant có trong flash sale đang active không
-            Optional<com.lumiere.app.service.dto.FlashSaleProductDTO> flashSaleProductOpt = 
+            Optional<com.lumiere.app.service.dto.FlashSaleProductDTO> flashSaleProductOpt =
                 flashSaleProductService.findActiveByProductVariantId(cartItem.getVariantId());
             if (flashSaleProductOpt.isPresent()) {
                 com.lumiere.app.service.dto.FlashSaleProductDTO flashSaleProduct = flashSaleProductOpt.get();
@@ -1662,7 +1771,7 @@ public class OrdersServiceImpl implements OrdersService {
                     unitPrice = flashSaleProduct.getSalePrice();
                 }
             }
-            
+
             // Tính totalPrice
             BigDecimal itemTotalPrice = unitPrice.multiply(BigDecimal.valueOf(cartItem.getQuantity()));
 
@@ -1680,22 +1789,20 @@ public class OrdersServiceImpl implements OrdersService {
         createOrderStatusHistory(order, OrderStatus.PENDING, "Đơn hàng được tạo bởi khách vãng lai");
 
         // Gửi notification cho admin về đơn hàng mới
-        String adminMessage = String.format("Có đơn hàng mới #%s từ khách vãng lai với tổng tiền %s VND", 
-            orderCode, totalAmount);
-        notificationProducerService.sendAdminNotification(
-            NotificationType.NEW_ORDER,
-            adminMessage,
-            "/admin/orders/" + order.getId()
-        );
+        String adminMessage = String.format("Có đơn hàng mới #%s từ khách vãng lai với tổng tiền %s VND", orderCode, totalAmount);
+        notificationProducerService.sendAdminNotification(NotificationType.NEW_ORDER, adminMessage, "/admin/orders/" + order.getId());
 
         // Gửi message vào Kafka để xử lý stock quantity bất đồng bộ
-        List<OrderStockProcessingMessage.StockDeductionItem> stockItems = cartItems.stream()
-            .map(cartItem -> new OrderStockProcessingMessage.StockDeductionItem(
-                cartItem.getVariantId(),
-                cartItem.getQuantity() != null ? cartItem.getQuantity().longValue() : 0L
-            ))
+        List<OrderStockProcessingMessage.StockDeductionItem> stockItems = cartItems
+            .stream()
+            .map(cartItem ->
+                new OrderStockProcessingMessage.StockDeductionItem(
+                    cartItem.getVariantId(),
+                    cartItem.getQuantity() != null ? cartItem.getQuantity().longValue() : 0L
+                )
+            )
             .collect(Collectors.toList());
-        
+
         OrderStockProcessingMessage stockMessage = new OrderStockProcessingMessage(order.getId(), stockItems);
         orderStockProducerService.sendStockProcessingMessage(stockMessage);
         LOG.info("Sent stock processing message to Kafka for guest order: {}", order.getId());

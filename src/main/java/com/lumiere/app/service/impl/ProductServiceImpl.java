@@ -6,6 +6,8 @@ import com.lumiere.app.domain.ProductAttachment;
 import com.lumiere.app.domain.ProductAttachmentId;
 import com.lumiere.app.domain.ProductVariant;
 import com.lumiere.app.repository.AttachmentRepository;
+import com.lumiere.app.repository.OptionGroupRepository;
+import com.lumiere.app.repository.OptionVariantRepository;
 import com.lumiere.app.repository.ProductAttachmentRepository;
 import com.lumiere.app.repository.ProductRepository;
 import com.lumiere.app.repository.ProductVariantRepository;
@@ -15,15 +17,13 @@ import com.lumiere.app.service.dto.AttachmentDTO;
 import com.lumiere.app.service.dto.ProductDTO;
 import com.lumiere.app.service.mapper.AttachmentMapper;
 import com.lumiere.app.service.mapper.ProductMapper;
-
+import com.lumiere.app.utils.CodeUtils;
+import com.lumiere.app.utils.SlugUtils;
 import java.math.BigDecimal;
 import java.security.SecureRandom;
 import java.time.Instant;
 import java.util.*;
 import java.util.stream.Collectors;
-
-import com.lumiere.app.utils.CodeUtils;
-import com.lumiere.app.utils.SlugUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
@@ -50,8 +50,20 @@ public class ProductServiceImpl implements ProductService {
     private final ProductAttachmentRepository productAttachmentRepository;
     private final AttachmentMapper attachmentMapper;
     private final ProductVariantRepository productVariantRepository;
+    private final OptionVariantRepository optionVariantRepository;
+    private final OptionGroupRepository optionGroupRepository;
 
-    public ProductServiceImpl(ProductRepository productRepository, ProductMapper productMapper, AttachmentService attachmentService, AttachmentRepository attachmentRepository, ProductAttachmentRepository productAttachmentRepository, AttachmentMapper attachmentMapper, ProductVariantRepository productVariantRepository) {
+    public ProductServiceImpl(
+        ProductRepository productRepository,
+        ProductMapper productMapper,
+        AttachmentService attachmentService,
+        AttachmentRepository attachmentRepository,
+        ProductAttachmentRepository productAttachmentRepository,
+        AttachmentMapper attachmentMapper,
+        ProductVariantRepository productVariantRepository,
+        OptionVariantRepository optionVariantRepository,
+        OptionGroupRepository optionGroupRepository
+    ) {
         this.productRepository = productRepository;
         this.productMapper = productMapper;
         this.attachmentService = attachmentService;
@@ -59,6 +71,8 @@ public class ProductServiceImpl implements ProductService {
         this.productAttachmentRepository = productAttachmentRepository;
         this.attachmentMapper = attachmentMapper;
         this.productVariantRepository = productVariantRepository;
+        this.optionVariantRepository = optionVariantRepository;
+        this.optionGroupRepository = optionGroupRepository;
     }
 
     @Override
@@ -83,17 +97,12 @@ public class ProductServiceImpl implements ProductService {
         Long productId = product.getId();
         // Lấy danh sách attachmentId từ list AttachmentDTO
         List<Long> desiredAttachmentIds = productDTO.getAttachmentDTOS() != null
-            ? productDTO.getAttachmentDTOS().stream()
-            .map(AttachmentDTO::getId)
-            .filter(Objects::nonNull)
-            .toList()
+            ? productDTO.getAttachmentDTOS().stream().map(AttachmentDTO::getId).filter(Objects::nonNull).toList()
             : Collections.emptyList();
 
         // 3. Đọc các attachment hiện tại trong DB
         List<ProductAttachment> existingLinks = productAttachmentRepository.findAllByProductId(productId);
-        Set<Long> currentAttachmentIds = existingLinks.stream()
-            .map(pa -> pa.getId().getAttachmentId())
-            .collect(Collectors.toSet());
+        Set<Long> currentAttachmentIds = existingLinks.stream().map(pa -> pa.getId().getAttachmentId()).collect(Collectors.toSet());
 
         // 4. Tính các phần cần thêm và cần xóa
         Set<Long> toAdd = new HashSet<>(desiredAttachmentIds);
@@ -105,7 +114,8 @@ public class ProductServiceImpl implements ProductService {
         // 5. Thêm các liên kết mới
         if (!toAdd.isEmpty()) {
             Product finalProduct = product;
-            List<ProductAttachment> newLinks = toAdd.stream()
+            List<ProductAttachment> newLinks = toAdd
+                .stream()
                 .map(attId -> {
                     ProductAttachmentId id = new ProductAttachmentId();
                     id.setProductId(productId);
@@ -130,16 +140,21 @@ public class ProductServiceImpl implements ProductService {
         return productMapper.toDto(product);
     }
 
-
     @Transactional
     @Override
     public ProductDTO createProductDTO(ProductDTO dto) {
         // 1) Lấy set attachment DTO người dùng gửi lên
-        final Set<AttachmentDTO> incomingDtos =
-            Optional.ofNullable(dto.getAttachmentDTOS()).orElseGet(HashSet::new);
+        final Set<AttachmentDTO> incomingDtos = Optional.ofNullable(dto.getAttachmentDTOS()).orElseGet(HashSet::new);
 
-        dto.setSlug(SlugUtils.toSlug(dto.getName()));
-        dto.setCode(CodeUtils.randomAlphaNum(10,random));
+        String baseSlug = SlugUtils.toSlug(dto.getName());
+        String slug = baseSlug;
+        int counter = 1;
+        while (productRepository.existsBySlug(slug)) {
+            slug = baseSlug + "-" + counter;
+            counter++;
+        }
+        dto.setSlug(slug);
+        dto.setCode(CodeUtils.randomAlphaNum(10, random));
         dto.setCreatedAt(Instant.now());
 
         // 2) Lưu product trước để có id (create/update)
@@ -151,7 +166,8 @@ public class ProductServiceImpl implements ProductService {
 
         // 3) Lấy danh sách attachmentId yêu cầu (lọc null)
         //    Nếu có item chưa có id nhưng có url -> cố gắng resolve id từ url
-        Set<Long> desiredIds = incomingDtos.stream()
+        Set<Long> desiredIds = incomingDtos
+            .stream()
             .map(a -> {
                 if (a.getId() != null) return a.getId();
                 if (a.getUrl() != null) {
@@ -165,23 +181,22 @@ public class ProductServiceImpl implements ProductService {
 
         // 4) Trạng thái hiện tại
         List<ProductAttachment> exists = productAttachmentRepository.findAllByProductId(productId);
-        Set<Long> currentIds = exists.stream()
-            .map(pa -> pa.getId().getAttachmentId())
-            .collect(Collectors.toSet());
+        Set<Long> currentIds = exists.stream().map(pa -> pa.getId().getAttachmentId()).collect(Collectors.toSet());
 
-// 5) Tính toAdd / toRemove
+        // 5) Tính toAdd / toRemove
         Set<Long> toAdd = new LinkedHashSet<>(desiredIds);
         toAdd.removeAll(currentIds);
 
         Set<Long> toRemove = new LinkedHashSet<>(currentIds);
         toRemove.removeAll(desiredIds);
 
-// Lấy reference để dùng cho @MapsId (không hit DB full entity)
+        // Lấy reference để dùng cho @MapsId (không hit DB full entity)
         Product productRef = productRepository.getReferenceById(productId);
 
-// 6) Thêm liên kết mới (PHẢI set associations cho @MapsId)
+        // 6) Thêm liên kết mới (PHẢI set associations cho @MapsId)
         if (!toAdd.isEmpty()) {
-            List<ProductAttachment> news = toAdd.stream()
+            List<ProductAttachment> news = toAdd
+                .stream()
                 .map(attId -> {
                     Attachment attachmentRef = attachmentRepository.getReferenceById(attId);
                     ProductAttachment pa = new ProductAttachment();
@@ -194,25 +209,20 @@ public class ProductServiceImpl implements ProductService {
             productAttachmentRepository.saveAll(news);
         }
 
-// 7) Xoá liên kết thừa
+        // 7) Xoá liên kết thừa
         if (!toRemove.isEmpty()) {
             productAttachmentRepository.deleteByProductIdAndAttachmentIdIn(productId, toRemove);
         }
 
-// 8) Nếu người dùng gửi rỗng → xoá hết
+        // 8) Nếu người dùng gửi rỗng → xoá hết
         if (desiredIds.isEmpty() && !currentIds.isEmpty()) {
             productAttachmentRepository.deleteByProductId(productId);
         }
 
-// 9) Trả DTO cuối cùng
-        List<Attachment> attached =  attachmentRepository.findAllByIds(desiredIds);
-        dto.setAttachmentDTOS(
-            attached.stream()
-                .map(attachmentMapper::toDto)
-                .collect(Collectors.toCollection(LinkedHashSet::new))
-        );
+        // 9) Trả DTO cuối cùng
+        List<Attachment> attached = attachmentRepository.findAllByIds(desiredIds);
+        dto.setAttachmentDTOS(attached.stream().map(attachmentMapper::toDto).collect(Collectors.toCollection(LinkedHashSet::new)));
         return dto;
-
     }
 
     @Override
@@ -235,14 +245,15 @@ public class ProductServiceImpl implements ProductService {
     public Optional<ProductDTO> findOne(Long id) {
         LOG.debug("Request to get Product : {}", id);
         Optional<ProductDTO> productDTO = productRepository.findById(id).map(productMapper::toDto);
-        if(productDTO.isPresent()){
+        if (productDTO.isPresent()) {
             List<ProductAttachment> productAttachments = productAttachmentRepository.findAllByProductId(id);
-            if(!productAttachments.isEmpty()){
-                List<AttachmentDTO> attachmentDTOS = attachmentService.findAllByIdIn(productAttachments.stream().map(productAttachment -> productAttachment.getId().getAttachmentId()).toList());
+            if (!productAttachments.isEmpty()) {
+                List<AttachmentDTO> attachmentDTOS = attachmentService.findAllByIdIn(
+                    productAttachments.stream().map(productAttachment -> productAttachment.getId().getAttachmentId()).toList()
+                );
                 productDTO.get().setAttachmentDTOS(new HashSet<>(attachmentDTOS));
                 productDTO.get().setProductAttachments(null);
             }
-
         }
         return productDTO;
     }
@@ -250,27 +261,53 @@ public class ProductServiceImpl implements ProductService {
     @Override
     public void delete(Long id) {
         LOG.debug("Request to delete Product : {}", id);
+
+        // 1. ProductAttachments are deleted automatically by Hibernate via CascadeType.ALL
+
+        // 2. Delete OptionVariants (bridge table)
+        List<com.lumiere.app.domain.OptionVariant> optionVariants = optionVariantRepository.findByProductVariant_Product_Id(id);
+        if (!optionVariants.isEmpty()) {
+            optionVariantRepository.deleteAll(optionVariants);
+        }
+
+        // 2.5 Cleanup variant relations to avoid foreign key constraints
+        productRepository.unlinkOrderItemsByProductId(id);
+        productRepository.deleteInventoryByProductId(id);
+        productRepository.deleteStockMovementByProductId(id);
+        productRepository.deleteStockNotificationByProductId(id);
+        productRepository.deleteFlashSaleProductByProductId(id);
+
+        // 3. Delete ProductVariants
+        List<com.lumiere.app.domain.ProductVariant> variants = productVariantRepository.findByProductId(id);
+        if (!variants.isEmpty()) {
+            productVariantRepository.deleteAll(variants);
+        }
+
+        // 4. Delete OptionGroups (and its OptionSelects via cascade)
+        List<com.lumiere.app.domain.OptionGroup> groups = optionGroupRepository.findByProduct_IdOrderByPositionAscIdAsc(id);
+        if (!groups.isEmpty()) {
+            optionGroupRepository.deleteAll(groups);
+        }
+
+        // 4.5. Cleanup Many-To-Many relations where Product is NOT the owner
+        productRepository.deleteCollectionRelations(id);
+        productRepository.deleteWishlistRelations(id);
+
+        // 4.6. Cleanup CartItems that reference this product
+        productRepository.deleteCartItemsByProductId(id);
+
+        // 5. Delete Product
         productRepository.deleteById(id);
     }
 
     @Override
-    public Page<ProductDTO> searchProducts(
-        List<Long> categoryIds,
-        BigDecimal minPrice,
-        BigDecimal maxPrice,
-        Pageable pageable
-    ) {
+    public Page<ProductDTO> searchProducts(List<Long> categoryIds, BigDecimal minPrice, BigDecimal maxPrice, Pageable pageable) {
         if (categoryIds != null && categoryIds.isEmpty()) {
             categoryIds = null;
         }
 
         // Bước 1: page theo id
-        Page<Long> idPage = productRepository.searchProductIdsByCategoryAndCheapestVariantPrice(
-            categoryIds,
-            minPrice,
-            maxPrice,
-            pageable
-        );
+        Page<Long> idPage = productRepository.searchProductIdsByCategoryAndCheapestVariantPrice(categoryIds, minPrice, maxPrice, pageable);
 
         List<Long> ids = idPage.getContent();
         if (ids.isEmpty()) {
@@ -287,9 +324,7 @@ public class ProductServiceImpl implements ProductService {
         }
         products.sort(Comparator.comparing(p -> orderMap.getOrDefault(p.getId(), Integer.MAX_VALUE)));
 
-        List<ProductDTO> dtos = products.stream()
-            .map(productMapper::toDto)
-            .toList();
+        List<ProductDTO> dtos = products.stream().map(productMapper::toDto).toList();
 
         return new PageImpl<>(dtos, pageable, idPage.getTotalElements());
     }
@@ -298,17 +333,17 @@ public class ProductServiceImpl implements ProductService {
     @Transactional(readOnly = true)
     public Map<Long, String> getProductImagesMapByVariantId(Long productId) {
         LOG.debug("Request to get product images map by variant ID for product : {}", productId);
-        
+
         Map<Long, String> imageMap = new HashMap<>();
-        
+
         // Lấy product
         Optional<Product> productOpt = productRepository.findById(productId);
         if (productOpt.isEmpty()) {
             return imageMap;
         }
-        
+
         Product product = productOpt.get();
-        
+
         // Thêm ảnh chung của product với key = 0L
         if (product.getImages() != null && !product.getImages().trim().isEmpty()) {
             String images = product.getImages();
@@ -316,8 +351,7 @@ public class ProductServiceImpl implements ProductService {
             if (images.startsWith("[")) {
                 try {
                     // Parse JSON array đơn giản
-                    images = images.replace("[", "").replace("]", "")
-                                   .replace("\"", "").trim();
+                    images = images.replace("[", "").replace("]", "").replace("\"", "").trim();
                     if (!images.isEmpty()) {
                         String firstImage = images.split(",")[0].trim();
                         imageMap.put(0L, firstImage);
@@ -331,17 +365,17 @@ public class ProductServiceImpl implements ProductService {
                 imageMap.put(0L, firstImage);
             }
         }
-        
-        // Lấy tất cả variants của product  
+
+        // Lấy tất cả variants của product
         List<ProductVariant> variants = productVariantRepository.findByProductId(productId);
-        
+
         // Thêm ảnh riêng của từng variant
         for (ProductVariant variant : variants) {
             if (variant.getUrlImage() != null && !variant.getUrlImage().trim().isEmpty()) {
                 imageMap.put(variant.getId(), variant.getUrlImage());
             }
         }
-        
+
         return imageMap;
     }
 }

@@ -6,11 +6,9 @@ import com.lumiere.app.service.FlashSaleProductService;
 import com.lumiere.app.service.ProductVariantService;
 import com.lumiere.app.service.dto.ProductVariantDTO;
 import com.lumiere.app.service.mapper.ProductVariantMapper;
-
+import com.lumiere.app.utils.MergeUtils;
 import java.util.List;
 import java.util.Optional;
-
-import com.lumiere.app.utils.MergeUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
@@ -61,15 +59,12 @@ public class ProductVariantServiceImpl implements ProductVariantService {
 
     @Override
     public Optional<ProductVariantDTO> partialUpdate(ProductVariantDTO dto) {
-
         return productVariantRepository
             .findById(dto.getId())
             .map(existing -> {
                 ProductVariant incoming = productVariantMapper.toEntity(dto);
 
-                MergeUtils.Options opts = new MergeUtils.Options()
-                    .overwriteNulls(false)
-                    .replaceCollections(false);
+                MergeUtils.Options opts = new MergeUtils.Options().overwriteNulls(false).replaceCollections(false);
 
                 MergeUtils.merge(incoming, existing, opts);
 
@@ -91,7 +86,8 @@ public class ProductVariantServiceImpl implements ProductVariantService {
         // Set promotionPrice từ FlashSaleProduct nếu có
         result.ifPresent(dto -> {
             if (dto.getId() != null) {
-                flashSaleProductService.findActiveByProductVariantId(dto.getId())
+                flashSaleProductService
+                    .findActiveByProductVariantId(dto.getId())
                     .ifPresent(flashSaleProduct -> {
                         dto.setPromotionPrice(flashSaleProduct.getSalePrice());
                     });
@@ -103,15 +99,23 @@ public class ProductVariantServiceImpl implements ProductVariantService {
     @Override
     public void delete(Long id) {
         LOG.debug("Request to delete ProductVariant : {}", id);
+        productVariantRepository.deleteOptionVariantsByVariantId(id);
+        productVariantRepository.deleteCartItemsByVariantId(id);
+        productVariantRepository.unlinkOrderItemsByVariantId(id);
+        productVariantRepository.deleteInventoryByVariantId(id);
+        productVariantRepository.deleteStockMovementByVariantId(id);
+        productVariantRepository.deleteStockNotificationByVariantId(id);
+        productVariantRepository.deleteFlashSaleProductByVariantId(id);
         productVariantRepository.deleteById(id);
     }
 
     @Override
-    public List<ProductVariantDTO> findByProductId(Long productId){
+    public List<ProductVariantDTO> findByProductId(Long productId) {
         List<ProductVariantDTO> result = productVariantMapper.toDto(productVariantRepository.findByProductId(productId));
         result.forEach(dto -> {
             if (dto.getId() != null) {
-                flashSaleProductService.findActiveByProductVariantId(dto.getId())
+                flashSaleProductService
+                    .findActiveByProductVariantId(dto.getId())
                     .ifPresent(flashSaleProduct -> {
                         dto.setPromotionPrice(flashSaleProduct.getSalePrice());
                     });
@@ -121,17 +125,15 @@ public class ProductVariantServiceImpl implements ProductVariantService {
     }
 
     @Override
-    public void setIsDefault(Long variantId, Long productId){
-               List<ProductVariantDTO> variants = this.findByProductId(productId);
-               variants.forEach(v ->  {
-                   if(!v.getId().equals(variantId)){
-                       v.setIsDefault(false);
-                   }else{
-                       v.setIsDefault(true);
-                   }
-               });
-               productVariantRepository.saveAll(variants.stream().map(productVariantMapper::toEntity).toList());
+    public void setIsDefault(Long variantId, Long productId) {
+        List<ProductVariantDTO> variants = this.findByProductId(productId);
+        variants.forEach(v -> {
+            if (!v.getId().equals(variantId)) {
+                v.setIsDefault(false);
+            } else {
+                v.setIsDefault(true);
+            }
+        });
+        productVariantRepository.saveAll(variants.stream().map(productVariantMapper::toEntity).toList());
     }
-
-
 }

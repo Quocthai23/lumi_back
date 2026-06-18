@@ -19,8 +19,8 @@ logging:
     tech.jhipster: DEBUG
     org.hibernate.SQL: DEBUG
     com.lumi.app: DEBUG
-    javax.management.remote.rmi: ERROR  # Change this from DEBUG to ERROR
-    org.springframework.boot.actuate: ERROR  # Reduce actuator logs
+    javax.management.remote.rmi: ERROR # Change this from DEBUG to ERROR
+    org.springframework.boot.actuate: ERROR # Reduce actuator logs
 
 management:
   health:
@@ -64,7 +64,7 @@ spring:
           starttls:
             enable: true
             required: true
-  
+
   messages:
     cache-duration: PT1S # 1 second, see the ISO 8601 standard
   thymeleaf:
@@ -77,6 +77,7 @@ spring:
     producer:
       properties:
         acks: 1
+        max.block.ms: 2000
     listener:
       ack-mode: manual_immediate
     topic:
@@ -84,7 +85,7 @@ spring:
       order-stock-processing: order-stock-processing
 
 server:
-  port: 8080
+  port: 8081
   # make sure requests the proxy uri instead of the server one
   forward-headers-strategy: native
 
@@ -101,8 +102,16 @@ jhipster:
       max-entries: 100 # Number of objects in each cache entry
   # CORS is only enabled by default with the "dev" profile
   cors:
-    # Allow Ionic for JHipster by default (* no longer allowed in Spring Boot 2.4+)
-    allowed-origins: 'http://localhost:8100,http://localhost:5174,https://localhost:8100,http://localhost:9000,https://localhost:9000,http://localhost:9060,https://localhost:9060, http://localhost:5173'
+    allowed-origins:
+      - 'http://localhost:8100'
+      - 'http://localhost:5174'
+      - 'https://localhost:8100'
+      - 'http://localhost:9000'
+      - 'http://127.0.0.1:9000'
+      - 'https://localhost:9000'
+      - 'http://localhost:9060'
+      - 'https://localhost:9060'
+      - 'http://localhost:5173'
     # Enable CORS when running in GitHub Codespaces
     allowed-origin-patterns: 'https://*.githubpreview.dev'
     allowed-methods: '*'

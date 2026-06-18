@@ -94,7 +94,7 @@ spring:
   application:
     name: lumiere
   media:
-    root: uploads   # Linux/Mac. Trên Windows có thể đặt: D:/app/media
+    root: uploads # Linux/Mac. Trên Windows có thể đặt: D:/app/media
   spring:
     servlet:
       multipart:
@@ -191,6 +191,7 @@ spring:
       properties:
         acks: all
         retries: 3
+        max.block.ms: 2000
         max-in-flight-requests-per-connection: 5
     listener:
       ack-mode: batch
@@ -225,7 +226,7 @@ jhipster:
   #   allowed-methods: "*"
   #   allowed-headers: "*"
   #   exposed-headers: "Authorization,Link,X-Total-Count,X-${jhipster.clientApp.name}-alert,X-${jhipster.clientApp.name}-error,X-${jhipster.clientApp.name}-params"
-#     allow-credentials: true
+  #     allow-credentials: true
   #   max-age: 1800
   mail:
     from: lumiere@localhost
@@ -256,4 +257,4 @@ jhipster:
 
 # application
 app:
-  public-base-url: http://localhost:8080   # ví dụ: https://shop.example.com
+  public-base-url: http://localhost:8080 # ví dụ: https://shop.example.com

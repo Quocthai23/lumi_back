@@ -1,7 +1,6 @@
 package com.lumiere.app.service;
 
 import com.lumiere.app.domain.*; // for static metamodels
-import com.lumiere.app.domain.Customer;
 import com.lumiere.app.repository.CustomerRepository;
 import com.lumiere.app.service.criteria.CustomerCriteria;
 import com.lumiere.app.service.dto.CustomerDTO;

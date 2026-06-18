@@ -2,7 +2,6 @@ package com.lumiere.app.service.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.persistence.Lob;
-import jakarta.validation.constraints.*;
 import java.io.Serializable;
 import java.util.HashSet;
 import java.util.Objects;
