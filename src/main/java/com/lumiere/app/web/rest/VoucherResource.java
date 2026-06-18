@@ -165,7 +165,7 @@ public class VoucherResource {
         @RequestParam(name = "availableOnly", required = false, defaultValue = "false") boolean availableOnly
     ) {
         LOG.debug("REST request to get Vouchers with pagination, availableOnly: {}", availableOnly);
-        
+
         if (availableOnly) {
             Page<VoucherDTO> page = voucherService.findAllAvailable(pageable);
             HttpHeaders headers = PaginationUtil.generatePaginationHttpHeaders(ServletUriComponentsBuilder.fromCurrentRequest(), page);
@@ -221,10 +221,7 @@ public class VoucherResource {
         Optional<Long> userIdOpt = SecurityUtils.getCurrentUserId();
         if (userIdOpt.isPresent()) {
             Long userId = userIdOpt.get();
-            customerId = customerRepository
-                .findByUserId(userId)
-                .map(customer -> customer.getId())
-                .orElse(null);
+            customerId = customerRepository.findByUserId(userId).map(customer -> customer.getId()).orElse(null);
         }
 
         if (customerId == null) {
@@ -239,6 +236,7 @@ public class VoucherResource {
             VoucherCalculateResponseDTO response = voucherService.calculateDiscount(request, customerId);
             return ResponseEntity.ok().body(response);
         } catch (IllegalArgumentException e) {
+            e.printStackTrace();
             throw new BadRequestAlertException(e.getMessage(), ENTITY_NAME, "voucherinvalid");
         }
     }
@@ -255,13 +253,10 @@ public class VoucherResource {
         LOG.debug("REST request to claim Voucher : {}", id);
 
         // Lấy userId từ user hiện tại
-        Long userId = SecurityUtils
-            .getCurrentUserId()
-            .orElseThrow(() -> new BadRequestAlertException(
-                "Không tìm thấy thông tin người dùng. Vui lòng đăng nhập lại.",
-                ENTITY_NAME,
-                "usernotfound"
-            ));
+        Long userId = SecurityUtils.getCurrentUserId()
+            .orElseThrow(() ->
+                new BadRequestAlertException("Không tìm thấy thông tin người dùng. Vui lòng đăng nhập lại.", ENTITY_NAME, "usernotfound")
+            );
 
         try {
             CustomerVoucherDTO customerVoucherDTO = customerVoucherService.claimVoucher(userId, id);

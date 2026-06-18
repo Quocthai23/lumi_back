@@ -133,23 +133,25 @@ public class UserService {
         newUser.setImageUrl(userDTO.getImageUrl());
         newUser.setLangKey(userDTO.getLangKey());
         // new user is not active
-        newUser.setActivated(false);
+        newUser.setActivated(true);
         // new user gets registration key
         newUser.setActivationKey(RandomUtil.generateActivationKey());
         Set<Authority> authorities = new HashSet<>();
         authorityRepository.findById(AuthoritiesConstants.USER).ifPresent(authorities::add);
         newUser.setAuthorities(authorities);
         userRepository.save(newUser);
-        
+
         // Link customer to user if customerId is provided
         if (customerId != null) {
-            customerRepository.findById(customerId).ifPresent(customer -> {
-                customer.setUser(newUser);
-                customerRepository.save(customer);
-                LOG.debug("Linked Customer {} to User {}", customerId, newUser.getLogin());
-            });
+            customerRepository
+                .findById(customerId)
+                .ifPresent(customer -> {
+                    customer.setUser(newUser);
+                    customerRepository.save(customer);
+                    LOG.debug("Linked Customer {} to User {}", customerId, newUser.getLogin());
+                });
         }
-        
+
         this.clearUserCaches(newUser);
         LOG.debug("Created Information for User: {}", newUser);
         return newUser;
