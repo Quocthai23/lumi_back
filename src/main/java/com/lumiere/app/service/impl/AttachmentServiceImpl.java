@@ -95,6 +95,9 @@ public class AttachmentServiceImpl implements AttachmentService {
                     try {
                         Files.deleteIfExists(mediaRoot.resolve("attachments").resolve(name).normalize());
                     } catch (Exception ignored) {}
+                    try {
+                        Files.deleteIfExists(Path.of("D:\\Lumiere_FrontEnd\\public\\uploads\\attachments").resolve(name).normalize());
+                    } catch (Exception ignored) {}
                 }
                 attachmentRepository.delete(att);
             });

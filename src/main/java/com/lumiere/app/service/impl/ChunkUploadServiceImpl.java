@@ -89,6 +89,14 @@ public class ChunkUploadServiceImpl implements ChunkUploadService {
         }
         Files.move(staging, finalFile, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
 
+        // Also copy to frontend
+        try {
+            Path frontendDir = Path.of("D:\\Lumiere_FrontEnd\\public\\uploads\\attachments").normalize();
+            Files.createDirectories(frontendDir);
+            Path frontendFile = frontendDir.resolve(safeName).normalize();
+            Files.copy(finalFile, frontendFile, StandardCopyOption.REPLACE_EXISTING);
+        } catch (Exception ignored) {}
+
         // 4) Metadata
         String contentType = Optional.ofNullable(Files.probeContentType(finalFile)).orElseGet(() -> mimeFromExt(ext));
         long size = Files.size(finalFile);

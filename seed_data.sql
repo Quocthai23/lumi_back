@@ -195,7 +195,7 @@ INSERT INTO orders (id, code, currency, customer_id, fulfillment_status, note, p
 (1107, 'ORD-2026007', 'USD', 1107, 'UNFULFILLED', 'Fragile item, handle with care', 'UNPAID', NOW(), 'PENDING', 45.00, 0.00, 'MOMO', 0, NULL, 3.00, '{"carrier":"GHTK","tracking_number":""}'),
 (1108, 'ORD-2026008', 'USD', 1108, 'UNFULFILLED', '', 'PAID', NOW(), 'COMPLETED', 38.00, 0.00, 'VNPAY', 0, NULL, 0.00, '{"carrier":"ViettelPost","tracking_number":"VT1234567"}'),
 (1109, 'ORD-2026009', 'USD', 1109, 'UNFULFILLED', '', 'PAID', NOW(), 'CONFIRMED', 95.00, 0.00, 'VNPAY', 20, NULL, 0.00, '{"carrier":"GHTK","tracking_number":""}'),
-(1110, 'ORD-2026010', 'USD', 1110, 'UNFULFILLED', '', 'UNPAID', NOW(), 'CANCELED', 50.00, 5.00, 'COD', 0, 1103, 5.00, '{"carrier":"VNPost","tracking_number":""}');
+(1110, 'ORD-2026010', 'USD', 1110, 'UNFULFILLED', '', 'UNPAID', NOW(), 'CANCELLED', 50.00, 5.00, 'COD', 0, 1103, 5.00, '{"carrier":"VNPost","tracking_number":""}');
 
 -- 14. Seed data for ORDER_ITEM (ids 1101 to 1110)
 INSERT INTO order_item (id, name_snapshot, order_id, quantity, sku_snapshot, total_price, unit_price, product_variant_id) VALUES

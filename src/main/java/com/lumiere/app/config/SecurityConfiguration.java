@@ -110,6 +110,8 @@ public class SecurityConfiguration {
                     .permitAll()
                     .requestMatchers(mvc.pattern(HttpMethod.GET, "/api/flash-sale-products/**"))
                     .permitAll()
+                    .requestMatchers(mvc.pattern(HttpMethod.GET, "/api/attachments/**"))
+                    .permitAll()
                     .requestMatchers(mvc.pattern(HttpMethod.POST, "/api/customers"))
                     .permitAll()
                     .requestMatchers(mvc.pattern("/api/admin/**"))
